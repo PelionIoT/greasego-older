@@ -1,2 +1,2 @@
-# greaseGo
+# greasego
 Go bindings for greaseLib
