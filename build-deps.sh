@@ -39,13 +39,34 @@ fi
 echo "Building libgrease.a"
 # make sure we build fresh
 rm -f *.o *.a
-make libgrease.a
+# make the server version - which basically just bypasses checks for symbols
+# on the client logging code
+make libgrease.a-server
+make libgrease.so.1
 
 if [ -e libgrease.a ]; then
+    # migrate all of the greaselib dependencies up to the folder Go will use
+    cp -r deps/build/lib/* $SELF/deps/lib
+    cp -r deps/build/include/* $SELF/deps/include
+    # move our binary into lib - static is all we use
     cp libgrease.a $SELF/deps/lib
+    cp *.h $SELF/deps/include
     echo ">>>>>>>>> Success. libgrease.a ready."
 else
     echo ">>>>>>>>> ERROR: libgrease.a missing or not built."
+fi
+
+
+if [ -e libgrease.so.1 ]; then
+    # migrate all of the greaselib dependencies up to the folder Go will use
+    cp -r deps/build/lib/* $SELF/deps/lib
+    cp -r deps/build/include/* $SELF/deps/include
+    # move our binary into lib - static is all we use
+    cp libgrease.so.1 $SELF/deps/lib
+    cp *.h $SELF/deps/include
+    echo ">>>>>>>>> Success. libgrease.so.1 ready."
+else
+    echo ">>>>>>>>> ERROR: libgrease.so.1 missing or not built."
 fi
 
 
