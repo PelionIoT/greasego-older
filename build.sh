@@ -11,10 +11,15 @@ THIS_DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 
 
 
+
 if [ ! -e "${THIS_DIR}/deps/lib/libgrease.a" ]; then
     echo ""
     echo "Build dependencies first!!!!!!!"
     echo ""
 fi
 
+cd $THIS_DIR
+
 make bindings.a
+go build github.com/WigWagCo/greasego
+go install github.com/WigWagCo/greasego

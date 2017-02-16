@@ -14,7 +14,16 @@ package greasego
 
 */
 import "C"
-import "unsafe"
+
+// import "C" has to be on it's own line, or go compiler freaks out
+import (
+	"unsafe"
+	"fmt"
+	"reflect"
+	"strings"
+//	"sync"
+	"sync/atomic"	
+)
 
 //-static-libgcc 
 // # cgo LDFLAGS: /usr/lib/x86_64-linux-gnu/libunwind-coredump.so.0 
@@ -32,24 +41,55 @@ import "unsafe"
 */
 
 
-type GreaseLibStartCB interface {
-	GreaseLib_start_cb()
+const GREASE_LIB_OK int = 0
+const GREASE_LIB_NOT_FOUND int = 0x01E00000
+
+// This interface is for providing a special callback to called when the 
+// greaseLib starts
+type GreaseLibStartCB func ();
+
+//type GreaseLibStartCB interface {
+//	GreaseLib_start_cb()
+//}
+
+// GreaseError is used for error reporting from greaseLib, and is analagous
+// to the same structure in the C library. An errornum of 0 means 'no error'
+type GreaseError struct {
+	errorstr string
+	errornum int
 }
 
+//This generic interfaces represents places in the 
+// greaseLib where the C GreaseLibCallback(err,void *) is used, but no data is ever 
+// passed back with the void pointer
+type GreaseLibCallbackNoData interface {
+	greaseLibCallback(err GreaseError) 
+}
+
+// Callback used for a callback which 
+type GreaseLibAddTargetCB func (err GreaseError, targId uint32)
+
+// This interface is used for a 'callback target' in go. The 
+// greaseLibCallback(err,data) will be called with a 'data' string representing
+// all log data since the last callback
+type GreaseLibCallbackTarget interface {
+	greaseLibCallback(err GreaseError,data string)	
+}
+
+// The GreaseLib structure represents a single instantiation of the 
+// library. For now, only one instantiation is supported. 
 type GreaseLib struct {
 	_greaseLibStartCB GreaseLibStartCB
 }
 
-
-//export do_startGreaseLib_cb
-func do_startGreaseLib_cb() {
-	_instance := getGreaseLib()	
-	if(_instance._greaseLibStartCB != nil) {
-		_instance._greaseLibStartCB.GreaseLib_start_cb();
-	}	
+type GreaseLibCallbackEvent struct {
+	data interface{}
+	err *GreaseError
 }
 
 
+// The library currently only supports a single instance
+// This variable tracks the singleton
 var greaseInstance *GreaseLib = nil
 
 func getGreaseLib() *GreaseLib {
@@ -59,9 +99,407 @@ func getGreaseLib() *GreaseLib {
 	return greaseInstance;
 }
 
+type GreaseLibTargetFileOpts struct {
+//	uint32 _enabledFlags
+//	uint32_t _enabledFlags;
+	_binding C.GreaseLibTargetFileOpts
+	Mode uint32           // permissions for file (recommend default)
+	Flags uint32          // file flags (recommend default)
+	Max_files uint32      // max # of files to maintain (rotation)
+	Max_file_size uint32  // max size for any one file
+	Max_total_size uint64 // max total size to maintain in rotation	
+}
 
+// analgous to greaseLib GreaseLibTargetOpts
+type GreaseLibTargetOpts struct {
+	_binding C.GreaseLibTargetOpts
+	Delim *string
+	Delim_output *string 
+	TTY *string 
+	File *string
+	OptsId int // filled in automatically
+	TargetCB GreaseLibCallbackTarget // used if this is target is a callback
+	FileOpts *GreaseLibTargetFileOpts // nil if not used
+	Format_pre *string 
+	Format_time *string 
+	Format_level *string 
+	Format_tag *string 
+	Format_origin *string 
+	Format_post *string 
+	Format_pre_msg *string
+}
+
+
+var nextOptsId uint32 = 0;
+//var mutexAddTargetMap = make(map[uint32]
+
+
+//export do_startGreaseLib_cb
+func do_startGreaseLib_cb() {
+	_instance := getGreaseLib()	
+	if(_instance._greaseLibStartCB != nil) {
+		_instance._greaseLibStartCB();
+	}	
+}
+
+// Start the library. The the cb.GreaseLib_start_cb() callback will be called
+// upon start.
 func StartGreaseLib(cb GreaseLibStartCB) {
 	_instance := getGreaseLib()
 	_instance._greaseLibStartCB = cb	
+	fmt.Printf("calling GreaseLib_start()\n")
 	C.GreaseLib_start((C.GreaseLibCallback)(unsafe.Pointer(C.greasego_startGreaseLibCB)));
 }
+
+// looks for a field in a struct with 'tag' and returns that
+// field's reflect.Type
+func findTypeByTag(tag string,	in interface{}) reflect.Type {
+	typ := reflect.TypeOf(in)
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		found := field.Tag.Get("greaseType")
+//		fmt.Println("found greaseType tag of",found)
+		if(len(found) > 0 && strings.Compare(found, tag) == 0) {
+			fmt.Println("Found template type of",field.Type," - tag:",tag)
+			return field.Type
+		}
+	}	
+	return nil
+}
+
+// Assigns values to a struct based on StructTags of `greaseAssign` and `greaseType`
+// Not that with string, this always assumes the structure it will fill will have a *string, not a string
+func TargetAssignFromStruct(opts interface{},obj interface{}, typ reflect.Type) {
+	// recommended reading if not familiar with reflect: https://blog.golang.org/laws-of-reflection
+	// first deal with all string fields
+	assignToStruct := reflect.ValueOf(opts).Elem()
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		fieldval := reflect.ValueOf(obj).FieldByName(field.Name)
+		fieldType := field.Type
+		if alias, ok := field.Tag.Lookup("greaseAssign"); ok {			
+			assignToField := assignToStruct.FieldByName(alias)
+			if(fieldType.Kind() == reflect.String) {
+	//			if alias, ok := field.Tag.Lookup("greaseAssign"); ok {
+					if alias != "" {
+		//				fmt.Println("alias: ",alias)
+		//				if(reflect.ValueOf(obj).FieldByName(alias).IsValid() ) {				
+						if(fieldval.IsValid()) {
+							val := reflect.New(fieldType)
+							val.Elem().Set(fieldval)
+							if(len(fieldval.String()) > 0) {
+								fmt.Println("Will assign:",fieldval.String())
+								if(reflect.ValueOf(opts).Elem().FieldByName(alias).CanSet()) {
+									 fmt.Printf("Set string Ptr value to <%s>\n",val.Elem().String())
+									 reflect.ValueOf(opts).Elem().FieldByName(alias).Set(val)
+								} else {
+									fmt.Println("ERROR: No valid field of name:",alias)
+								}
+							} else {
+		//						fmt.Println("Skipping field",alias,"b/c was blank")
+							}
+		
+						} else {
+		//						fmt.Println("Skipping field",alias," not valid")
+						}
+		
+					} else {
+		//				fmt.Println("(blank)")				
+					}
+	//			} else {
+		//			fmt.Println("(not specified)")
+	//			}
+			} else {
+	
+				fmt.Println("here1")
+				
+				switch field.Type.Kind() {
+					case reflect.Int:
+						fallthrough			
+					case reflect.Int16:
+						fallthrough			
+					case reflect.Int32:
+						fallthrough
+					case reflect.Int64:
+						fallthrough
+					case reflect.Int8:
+						fallthrough
+					case reflect.Uint:
+						fallthrough
+					case reflect.Uint16:
+						fallthrough
+					case reflect.Uint32:
+						fallthrough
+					case reflect.Uint64:
+						fallthrough
+					case reflect.Uint8:
+	
+						fmt.Println("here1.1")
+//						if alias, ok := field.Tag.Lookup("greaseAssign"); ok {
+							if alias != "" {
+				//				fmt.Println("alias: ",alias)
+				//				if(reflect.ValueOf(obj).FieldByName(alias).IsValid() ) {				
+					fmt.Println("here1.2")
+								if(fieldval.IsValid()) {
+					fmt.Println("here1.3")
+									//							val := reflect.New(fieldType)
+		//							val.Elem().Set(fieldval)
+									if(len(fieldval.String()) > 0) { // if it's a string, make sure it's not empty
+										fmt.Println("Will assign:",fieldval.String(),"to",alias)
+										if(assignToField.IsValid()){
+											fmt.Println("valid field")
+										}
+										if(assignToField.CanSet()) {
+											 fmt.Printf("Set value to <%s>\n",fieldval.String())
+											 assignToField.Set(fieldval)
+										} else {
+											fmt.Println("ERROR: No valid field of name:",alias)
+										}
+									} else {
+				//						fmt.Println("Skipping field",alias,"b/c was blank")
+									}
+				
+								} else {
+				//						fmt.Println("Skipping field",alias," not valid")
+								}
+				
+							} else {
+				//				fmt.Println("(blank)")				
+							}
+//						}				
+					case reflect.Ptr:
+						fmt.Println("PTR found - in reflection")
+	
+						if(fieldval.IsValid()) {
+							fieldval = fieldval.Elem()
+							fieldType = fieldval.Elem().Type()				
+						}						
+						fallthrough
+										
+					case reflect.Struct:
+						fmt.Println("@struct")
+						strct_name := alias				
+//						if strct_name, ok := field.Tag.Lookup("greaseAssign"); ok {
+							fmt.Println("@struct w/ greaseAssign")				
+			
+							if strct_name != "" {
+								if strct_name != "" {
+									strct_orig := reflect.ValueOf(obj).FieldByName(field.Name)						
+									if(strct_orig.IsValid()) {
+										fmt.Println("@struct - recurse and New (",field.Name," - ",strct_name,")")
+										if(reflect.ValueOf(opts).Elem().FieldByName(strct_name).IsValid()) {
+											if(reflect.ValueOf(opts).Elem().FieldByName(strct_name).IsNil()) {
+		//										fmt.Println("but field is nil")											
+												typ := findTypeByTag(strct_name,obj) // I could not figure out a way to do this with pure reflection, so resorted to this
+												if(typ != nil) {
+													val := reflect.New(typ)
+													reflect.ValueOf(opts).Elem().FieldByName(strct_name).Set(val)	// assign newly created sub options (inner struct)									
+		//											inner_opts := val //reflect.ValueOf(opts).Elem().FieldByName(strct_name).Addr() // reflect.ValueOf(opts).Elem().FieldByName(strct_name).Elem()
+													TargetAssignFromStruct(val.Interface(),strct_orig.Interface(), strct_orig.Type())																				
+												} else {
+													fmt.Println("ERROR: could not find a template field for such greaseType label")
+												}							
+		//										val := reflect.New(reflect.Indirect(reflect.ValueOf(opts).Elem().FieldByName(strct_name)).Type())
+		//										reflect.ValueOf(opts).Elem().FieldByName(strct_name).Set(val)	// assign newly created sub options (inner struct)									
+											} else {
+												inner_opts := reflect.ValueOf(opts).Elem().FieldByName(strct_name) // reflect.ValueOf(opts).Elem().FieldByName(strct_name).Elem()
+												TargetAssignFromStruct(inner_opts,strct_orig.Interface(), strct_orig.Type())																			
+											}
+										} else {
+											fmt.Println("inner - not valid")
+										}
+									}
+				
+								}
+													
+							} // end if strct_name
+//						}			
+						
+														
+				}			
+			}
+		}
+		
+	}
+	fmt.Println("exit assign")
+}
+
+
+
+
+func convertOptsToCGreaseLib(opts *GreaseLibTargetOpts) {
+//	C.GreaseLib_init_GreaseLibTargetOpts(&opts._binding) // init it to the library defaults
+	if(opts.Delim != nil) {	
+		opts._binding.delim = C.CString(*opts.Delim)
+		opts._binding.len_delim = C.int(len(*opts.Delim))
+	}
+	if(opts.Delim_output != nil) {	
+		opts._binding.delim_output = C.CString(*opts.Delim_output)
+		opts._binding.len_delim_output = C.int(len(*opts.Delim_output))
+	}
+	if(opts.TTY != nil) {	
+		opts._binding.tty = C.CString(*opts.TTY)
+	}
+	if(opts.File != nil) {	
+		opts._binding.file = C.CString(*opts.File)
+	}
+
+	if(opts.Format_pre != nil) {	
+		opts._binding.format_pre = C.CString(*opts.Format_pre)
+		opts._binding.format_pre_len = C.int(len(*opts.Format_pre))
+	}
+	if(opts.Format_time != nil) {	
+		opts._binding.format_time = C.CString(*opts.Format_time)
+		opts._binding.format_time_len = C.int(len(*opts.Format_time))
+	}
+	if(opts.Format_level != nil) {	
+		opts._binding.format_level = C.CString(*opts.Format_level)
+		opts._binding.format_level_len = C.int(len(*opts.Format_level))
+	}
+	if(opts.Format_tag != nil) {	
+		opts._binding.format_tag = C.CString(*opts.Format_tag)
+		opts._binding.format_tag_len = C.int(len(*opts.Format_tag))
+	}
+	if(opts.Format_origin != nil) {	
+		opts._binding.format_origin = C.CString(*opts.Format_origin)
+		opts._binding.format_origin_len = C.int(len(*opts.Format_origin))
+	}
+	if(opts.Format_post != nil) {	
+		opts._binding.format_post = C.CString(*opts.Format_post)
+		opts._binding.format_post_len = C.int(len(*opts.Format_post))
+	}
+	if(opts.Format_pre_msg != nil) {	
+		opts._binding.format_pre_msg = C.CString(*opts.Format_pre_msg)
+		opts._binding.format_pre_msg_len = C.int(len(*opts.Format_pre_msg))
+	}
+}
+
+//export do_addTargetCB
+func do_addTargetCB(err *C.GreaseLibError, opts *C.GreaseLibTargetOpts) {
+	// TODO: convert to GreaseLibTargetOpts or number, fire correct callback
+}
+
+//export do_modifyDefaultTargetCB
+func do_modifyDefaultTargetCB(err *C.GreaseLibError, opts *C.GreaseLibTargetOpts) {
+	// TODO: convert to GreaseLibTargetOpts or number, fire correct callback
+}
+
+
+func NewGreaseLibTargetOpts() *GreaseLibTargetOpts {
+	ret := new(GreaseLibTargetOpts)
+	C.GreaseLib_init_GreaseLibTargetOpts(unsafe.Pointer(&ret._binding)) // init it to the library defaults
+	return ret
+}
+
+
+func AddTarget(opts *GreaseLibTargetOpts) {
+	convertOptsToCGreaseLib(opts)
+	opts._binding.optsId = C.int(atomic.AddUint32(&nextOptsId, 1)) // that ID needs to be unique amongst threads
+	C.greasego_wrapper_addTarget( &(opts._binding) )	// use the wrapper func
+}
+
+func ModifyDefaultTarget(opts *GreaseLibTargetOpts) int {
+	convertOptsToCGreaseLib(opts);	
+	return int(C.GreaseLib_modifyDefaultTarget( &opts._binding ))	// use the wrapper func	
+}
+
+const GREASE_LIB_SET_FILEOPTS_MODE uint32          = 0x10000000
+const GREASE_LIB_SET_FILEOPTS_FLAGS uint32         = 0x20000000
+const GREASE_LIB_SET_FILEOPTS_MAXFILES uint32      = 0x40000000
+const GREASE_LIB_SET_FILEOPTS_MAXFILESIZE uint32   = 0x80000000
+const GREASE_LIB_SET_FILEOPTS_MAXTOTALSIZE uint32  = 0x01000000
+const GREASE_LIB_SET_FILEOPTS_ROTATEONSTART uint32 = 0x02000000  // set if you want files to rotate on start
+const GREASE_LIB_SET_FILEOPTS_ROTATE uint32        = 0x04000000  // set if you want files to rotate, if not set all other rotate options are skipped
+
+
+func SetFileOpts( opts GreaseLibTargetOpts, flag uint32, val uint32 ) {
+	if(opts._binding.fileOpts == nil) { // it's a C pointer there, but apparently this works
+		opts._binding.fileOpts = C.GreaseLib_new_GreaseLibTargetFileOpts()
+	}
+	C.GreaseLib_set_flag_GreaseLibTargetFileOpts(opts._binding.fileOpts,C.uint32_t(val))
+}
+
+func SetupStandardLevels() int {
+	return int(C.GreaseLib_setupStandardLevels());
+}
+func SetupStandardTags() int {
+	return int(C.GreaseLib_setupStandardTags());
+}
+
+type GreaseLibFilter struct {
+	_binding C.GreaseLibFilter
+	_isInit bool
+//	_enabledFlags uint32
+//	origin uint32
+//	tag uint32
+//	target uint32
+//	mask uint32
+//	id uint32
+	format_pre *string
+	format_post *string
+	format_post_pre_msg *string	
+}
+
+func NewGreaseLibFilter() *GreaseLibFilter {
+	ret := new(GreaseLibFilter)
+	C.GreaseLib_init_GreaseLibTargetOpts(unsafe.Pointer(&ret._binding)) // init it to the library defaults
+	ret._isInit = true;	
+	return ret
+}
+
+func convertFilterToCGreaseLib(opts *GreaseLibFilter) {
+	if(!opts._isInit) {
+		C.GreaseLib_init_GreaseLibTargetOpts(unsafe.Pointer(&opts._binding)) // init it to the library defaults
+	}
+	if(opts.format_pre != nil) {	
+		opts._binding.format_pre = C.CString(*opts.format_pre)
+		opts._binding.format_pre_len = C.int(len(*opts.format_pre))
+	}
+	if(opts.format_post != nil) {	
+		opts._binding.format_post = C.CString(*opts.format_post)
+		opts._binding.format_post_len = C.int(len(*opts.format_post))
+	}
+	if(opts.format_post_pre_msg != nil) {	
+		opts._binding.format_post = C.CString(*opts.format_post_pre_msg)
+		opts._binding.format_post_pre_msg_len = C.int(len(*opts.format_post_pre_msg))
+	}
+	
+}
+
+func AddFilter(opts *GreaseLibFilter) int {
+	convertFilterToCGreaseLib(opts)
+	return int(C.GreaseLib_addFilter(&opts._binding))
+}
+func DisableFilter(opts *GreaseLibFilter) int {
+	return int(C.GreaseLib_disableFilter(&opts._binding))
+}
+func EnableFilter(opts *GreaseLibFilter) int {
+	return int(C.GreaseLib_enableFilter(&opts._binding))
+}
+
+const GREASE_LIB_SINK_UNIXDGRAM uint32  = 0x1
+const GREASE_LIB_SINK_PIPE uint32 = 0x2
+const GREASE_LIB_SINK_SYSLOGDGRAM uint32 = 0x3
+
+
+type GreaseLibSink struct {
+	_binding C.GreaseLibSink
+	id uint32
+}
+
+func NewGreaseLibSink(sinkType uint32, path *string) *GreaseLibSink {
+	sink := new(GreaseLibSink)
+	temppath := C.CString(*path)
+	C.GreaseLib_init_GreaseLibSink(&sink._binding,	C.uint32_t(sinkType), temppath) 
+	return sink
+} 
+
+func AddSink(sink *GreaseLibSink) int {
+	ret := int(C.GreaseLib_addSink(&sink._binding))
+	if(ret == GREASE_LIB_OK) {
+		sink.id = uint32(sink._binding.id)	
+	}
+	return ret	
+}
+
+
