@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"strings"
 //	"sync"
-	"sync/atomic"	
+//	"sync/atomic"	
 )
 
 //-static-libgcc 
@@ -55,8 +55,18 @@ type GreaseLibStartCB func ();
 // GreaseError is used for error reporting from greaseLib, and is analagous
 // to the same structure in the C library. An errornum of 0 means 'no error'
 type GreaseError struct {
-	errorstr string
-	errornum int
+	Str string
+	Errno int
+}
+
+func convertCGreaseError(err *C.GreaseLibError) *GreaseError {
+	if(err == nil) {
+		return nil
+	}
+	ret := new(GreaseError)
+	ret.Errno = int((*err)._errno)
+	ret.Str = C.GoString(&err.errstr[0])
+	return ret
 }
 
 //This generic interfaces represents places in the 
@@ -67,7 +77,7 @@ type GreaseLibCallbackNoData interface {
 }
 
 // Callback used for a callback which 
-type GreaseLibAddTargetCB func (err GreaseError, targId uint32)
+type GreaseLibAddTargetCB func (err *GreaseError, optsId int, targId uint32)
 
 // This interface is used for a 'callback target' in go. The 
 // greaseLibCallback(err,data) will be called with a 'data' string representing
@@ -127,12 +137,89 @@ type GreaseLibTargetOpts struct {
 	Format_origin *string 
 	Format_post *string 
 	Format_pre_msg *string
+	Name *string  // not used by greaseLib - but used for a string reference name 
+	              // for the target ID
 }
 
 
 var nextOptsId uint32 = 0;
 //var mutexAddTargetMap = make(map[uint32]
 
+type GreaseIdMap map[string]uint32
+
+var DefaultLevelMap GreaseIdMap
+var DefaultTagMap GreaseIdMap
+// [string]:[target ID]
+var TargetMap GreaseIdMap
+
+var addTargetCallbackMap map[int]GreaseLibAddTargetCB
+
+type GreaseLevel uint32
+
+const GREASE_ALL_LEVELS GreaseLevel = 0xFFFFFFFF //C.GREASE_ALL_LEVELS 
+
+func init() {
+	addTargetCallbackMap = map[int]GreaseLibAddTargetCB{};
+	
+	TargetMap = GreaseIdMap{
+		"default" : C.GREASE_DEFAULT_TARGET_ID,  // default target ID is always 0
+	}
+
+	// defined in grease_client.h
+	DefaultLevelMap = GreaseIdMap{
+		"log" : C.GREASE_LEVEL_LOG,
+		"error" : C.GREASE_LEVEL_ERROR,
+		"warn": C.GREASE_LEVEL_WARN,
+		"debug" : C.GREASE_LEVEL_DEBUG,
+		"debug2" : C.GREASE_LEVEL_DEBUG2,		
+		"debug3" : C.GREASE_LEVEL_DEBUG3,		
+		"user1" : C.GREASE_LEVEL_USER1,	
+		"user2" : C.GREASE_LEVEL_USER2,
+		"success" : C.GREASE_LEVEL_SUCCESS,
+		"info" : C.GREASE_LEVEL_INFO,
+		"trace" : C.GREASE_LEVEL_TRACE,
+	}
+	
+	DefaultTagMap = GreaseIdMap{
+		"stdout" : C.GREASE_TAG_STDOUT,
+		"stderr" : C.GREASE_TAG_STDERR,
+		"syslog" : C.GREASE_TAG_SYSLOG,
+		// deviceJS specific tags - defined in grease_lib.cc
+		"console" : C.GREASE_CONSOLE_TAG,
+		"native" : C.GREASE_NATIVE_TAG,
+		// grease_echo
+		"grease-echo": C.GREASE_ECHO_TAG,
+		// syslog common facility names:
+		// these are defined in grease_lib.cc, and are only for server use. Client should not use
+		// these tag unless they are logging through syslog() libc calls
+		"sys-auth" : uint32(C.GREASE_RESERVED_TAGS_SYS_AUTH),	
+		"sys-authpriv" : uint32(C.GREASE_RESERVED_TAGS_SYS_AUTHPRIV),
+		"sys-cron" : uint32(C.GREASE_RESERVED_TAGS_SYS_CRON),
+		"sys-daemon" : uint32(C.GREASE_RESERVED_TAGS_SYS_DAEMON),
+		"sys-ftp" : uint32(C.GREASE_RESERVED_TAGS_SYS_FTP),
+		"sys-kern" : uint32(C.GREASE_RESERVED_TAGS_SYS_KERN),
+		"sys-lpr" : uint32(C.GREASE_RESERVED_TAGS_SYS_LPR),
+		"sys-mail" : uint32(C.GREASE_RESERVED_TAGS_SYS_MAIL),
+		"sys-mark" : uint32(C.GREASE_RESERVED_TAGS_SYS_MARK),
+		"sys-security" : uint32(C.GREASE_RESERVED_TAGS_SYS_SECURITY),
+		"sys-syslog" : uint32(C.GREASE_RESERVED_TAGS_SYS_SYSLOG),
+		"sys-user" : uint32(C.GREASE_RESERVED_TAGS_SYS_USER),
+		"sys-uucp" : uint32(C.GREASE_RESERVED_TAGS_SYS_UUCP),
+		"sys-local0" : uint32(C.GREASE_RESERVED_TAGS_SYS_LOCAL0),
+		"sys-local1" : uint32(C.GREASE_RESERVED_TAGS_SYS_LOCAL1),
+		"sys-local2" : uint32(C.GREASE_RESERVED_TAGS_SYS_LOCAL2),
+		"sys-local3" : uint32(C.GREASE_RESERVED_TAGS_SYS_LOCAL3),
+		"sys-local4" : uint32(C.GREASE_RESERVED_TAGS_SYS_LOCAL4),
+		"sys-local5" : uint32(C.GREASE_RESERVED_TAGS_SYS_LOCAL5),
+		"sys-local6" : uint32(C.GREASE_RESERVED_TAGS_SYS_LOCAL6),
+		"sys-local7" : uint32(C.GREASE_RESERVED_TAGS_SYS_LOCAL7),	
+		
+	}
+}
+
+//func init() {
+//		
+//}
 
 //export do_startGreaseLib_cb
 func do_startGreaseLib_cb() {
@@ -169,9 +256,10 @@ func findTypeByTag(tag string,	in interface{}) reflect.Type {
 
 // Assigns values to a struct based on StructTags of `greaseAssign` and `greaseType`
 // Not that with string, this always assumes the structure it will fill will have a *string, not a string
-func TargetAssignFromStruct(opts interface{},obj interface{}, typ reflect.Type) {
+func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) {
 	// recommended reading if not familiar with reflect: https://blog.golang.org/laws-of-reflection
 	// first deal with all string fields
+	typ := reflect.TypeOf(obj);
 	assignToStruct := reflect.ValueOf(opts).Elem()
 	for i := 0; i < typ.NumField(); i++ {
 		field := typ.Field(i)
@@ -295,7 +383,7 @@ func TargetAssignFromStruct(opts interface{},obj interface{}, typ reflect.Type) 
 													val := reflect.New(typ)
 													reflect.ValueOf(opts).Elem().FieldByName(strct_name).Set(val)	// assign newly created sub options (inner struct)									
 		//											inner_opts := val //reflect.ValueOf(opts).Elem().FieldByName(strct_name).Addr() // reflect.ValueOf(opts).Elem().FieldByName(strct_name).Elem()
-													TargetAssignFromStruct(val.Interface(),strct_orig.Interface(), strct_orig.Type())																				
+													AssignFromStruct(val.Interface(),strct_orig.Interface())//, strct_orig.Type())																				
 												} else {
 													fmt.Println("ERROR: could not find a template field for such greaseType label")
 												}							
@@ -303,7 +391,7 @@ func TargetAssignFromStruct(opts interface{},obj interface{}, typ reflect.Type) 
 		//										reflect.ValueOf(opts).Elem().FieldByName(strct_name).Set(val)	// assign newly created sub options (inner struct)									
 											} else {
 												inner_opts := reflect.ValueOf(opts).Elem().FieldByName(strct_name) // reflect.ValueOf(opts).Elem().FieldByName(strct_name).Elem()
-												TargetAssignFromStruct(inner_opts,strct_orig.Interface(), strct_orig.Type())																			
+												AssignFromStruct(inner_opts,strct_orig.Interface()) //, strct_orig.Type())																			
 											}
 										} else {
 											fmt.Println("inner - not valid")
@@ -375,13 +463,47 @@ func convertOptsToCGreaseLib(opts *GreaseLibTargetOpts) {
 }
 
 //export do_addTargetCB
-func do_addTargetCB(err *C.GreaseLibError, opts *C.GreaseLibTargetOpts) {
+func do_addTargetCB(err *C.GreaseLibError, info *C.GreaseLibStartedTargetInfo) {
 	// TODO: convert to GreaseLibTargetOpts or number, fire correct callback
+	optsid := int(0)
+	fmt.Println("HERE1111 do_addTargetCB")
+	if(info != nil) {
+	fmt.Printf("opts -----------> %+v\n", *info)
+		goerr := convertCGreaseError(err)
+		if(goerr != nil) {
+			fmt.Printf("Error on Callback: %d\n",goerr.Errno)
+		}
+		optsid = int((*info).optsId)
+		fmt.Printf("HERE2222 do_addTargetCB %d\n",optsid)
+		cb := addTargetCallbackMap[optsid]
+		if( cb != nil) {
+			cb(goerr,optsid,uint32(info.targId))
+		} else {
+			fmt.Printf("NO CALLBACK FOUND. optsid: %d\n",optsid)
+		}
+	}		
 }
 
 //export do_modifyDefaultTargetCB
-func do_modifyDefaultTargetCB(err *C.GreaseLibError, opts *C.GreaseLibTargetOpts) {
+func do_modifyDefaultTargetCB(err *C.GreaseLibError, info *C.GreaseLibStartedTargetInfo) {
 	// TODO: convert to GreaseLibTargetOpts or number, fire correct callback
+	optsid := int(0)
+	fmt.Println("HERE1111 do_modifyDefaultTargetCB")
+	if(info != nil) {
+	fmt.Printf("opts -----------> %+v\n", *info)
+		goerr := convertCGreaseError(err)
+		if(goerr != nil) {
+			fmt.Printf("Error on Callback: %d\n",goerr.Errno)
+		}
+		optsid = int((*info).optsId)
+		fmt.Printf("HERE2222 do_modifyDefaultTargetCB %d\n",optsid)
+		cb := addTargetCallbackMap[optsid]
+		if( cb != nil) {
+			cb(goerr,optsid,uint32(info.targId))
+		} else {
+			fmt.Printf("NO CALLBACK FOUND. optsid: %d\n",optsid)
+		}
+	}
 }
 
 
@@ -391,10 +513,15 @@ func NewGreaseLibTargetOpts() *GreaseLibTargetOpts {
 	return ret
 }
 
-
-func AddTarget(opts *GreaseLibTargetOpts) {
+func AddTarget(opts *GreaseLibTargetOpts, cb GreaseLibAddTargetCB) {
 	convertOptsToCGreaseLib(opts)
-	opts._binding.optsId = C.int(atomic.AddUint32(&nextOptsId, 1)) // that ID needs to be unique amongst threads
+	optid := int(opts._binding.optsId)
+	// optid := atomic.AddUint32(&nextOptsId, 1)
+	// opts._binding.optsId = C.int(optid) // that ID needs to be unique amongst threads
+	if(cb != nil) {
+		addTargetCallbackMap[optid] = cb;		
+	}
+	fmt.Printf("HERE2222 AddTarget optsid: %d\n",optid)	
 	C.greasego_wrapper_addTarget( &(opts._binding) )	// use the wrapper func
 }
 
@@ -410,7 +537,6 @@ const GREASE_LIB_SET_FILEOPTS_MAXFILESIZE uint32   = 0x80000000
 const GREASE_LIB_SET_FILEOPTS_MAXTOTALSIZE uint32  = 0x01000000
 const GREASE_LIB_SET_FILEOPTS_ROTATEONSTART uint32 = 0x02000000  // set if you want files to rotate on start
 const GREASE_LIB_SET_FILEOPTS_ROTATE uint32        = 0x04000000  // set if you want files to rotate, if not set all other rotate options are skipped
-
 
 func SetFileOpts( opts GreaseLibTargetOpts, flag uint32, val uint32 ) {
 	if(opts._binding.fileOpts == nil) { // it's a C pointer there, but apparently this works
@@ -429,39 +555,61 @@ func SetupStandardTags() int {
 type GreaseLibFilter struct {
 	_binding C.GreaseLibFilter
 	_isInit bool
-//	_enabledFlags uint32
+
+	Origin uint32
+	Tag uint32
+	Target uint32
+	Mask uint32
+	
+	//	_enabledFlags uint32
 //	origin uint32
 //	tag uint32
 //	target uint32
 //	mask uint32
 //	id uint32
-	format_pre *string
-	format_post *string
-	format_post_pre_msg *string	
+	Format_pre *string
+	Format_post *string
+	Format_post_pre_msg *string	
 }
+
+const GREASE_LIB_SET_FILTER_ORIGIN uint32 = 0x1
+const GREASE_LIB_SET_FILTER_TAG    uint32 = 0x2
+const GREASE_LIB_SET_FILTER_TARGET uint32 = 0x4
+const GREASE_LIB_SET_FILTER_MASK   uint32 = 0x8
 
 func NewGreaseLibFilter() *GreaseLibFilter {
 	ret := new(GreaseLibFilter)
 	C.GreaseLib_init_GreaseLibTargetOpts(unsafe.Pointer(&ret._binding)) // init it to the library defaults
+	
+	ret.Mask = uint32(ret._binding.mask)
+	ret.Origin = uint32(ret._binding.origin)
+	ret.Tag = uint32(ret._binding.tag)	
+	ret.Target = uint32(ret._binding.target)
+	
 	ret._isInit = true;	
 	return ret
+}
+
+func SetFilterValue(filter *GreaseLibFilter, flag uint32, val uint32) {
+	// GreaseLib_setvalue_GreaseLibFilter(GreaseLibFilter *opts,uint32_t flag,uint32_t val)
+	C.GreaseLib_setvalue_GreaseLibFilter(&(filter._binding),C.uint32_t(flag),C.uint32_t(val))	
 }
 
 func convertFilterToCGreaseLib(opts *GreaseLibFilter) {
 	if(!opts._isInit) {
 		C.GreaseLib_init_GreaseLibTargetOpts(unsafe.Pointer(&opts._binding)) // init it to the library defaults
 	}
-	if(opts.format_pre != nil) {	
-		opts._binding.format_pre = C.CString(*opts.format_pre)
-		opts._binding.format_pre_len = C.int(len(*opts.format_pre))
+	if(opts.Format_pre != nil) {	
+		opts._binding.format_pre = C.CString(*opts.Format_pre)
+		opts._binding.format_pre_len = C.int(len(*opts.Format_pre))
 	}
-	if(opts.format_post != nil) {	
-		opts._binding.format_post = C.CString(*opts.format_post)
-		opts._binding.format_post_len = C.int(len(*opts.format_post))
+	if(opts.Format_post != nil) {	
+		opts._binding.format_post = C.CString(*opts.Format_post)
+		opts._binding.format_post_len = C.int(len(*opts.Format_post))
 	}
-	if(opts.format_post_pre_msg != nil) {	
-		opts._binding.format_post = C.CString(*opts.format_post_pre_msg)
-		opts._binding.format_post_pre_msg_len = C.int(len(*opts.format_post_pre_msg))
+	if(opts.Format_post_pre_msg != nil) {	
+		opts._binding.format_post = C.CString(*opts.Format_post_pre_msg)
+		opts._binding.format_post_pre_msg_len = C.int(len(*opts.Format_post_pre_msg))
 	}
 	
 }

@@ -13,8 +13,8 @@ int greasego_startGreaseLibCB(int in)
 // this is a GreaseLibCallback for addTarget
 int greasego_addTargetCB(GreaseLibError *err, void *d) {
 	if(d) {
-		printf("HERE - in addTargetCB\n");
 		GreaseLibStartedTargetInfo *info = 	(GreaseLibStartedTargetInfo *) d;
+		printf("HERE - in addTargetCB %d\n",info->optsId);		
 		return do_addTargetCB(err,info);
 	}
 
