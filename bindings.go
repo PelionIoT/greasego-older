@@ -124,7 +124,6 @@ type GreaseLibTargetFileOpts struct {
 type GreaseLibTargetOpts struct {
 	_binding C.GreaseLibTargetOpts
 	Delim *string
-	Delim_output *string 
 	TTY *string 
 	File *string
 	OptsId int // filled in automatically
@@ -139,8 +138,15 @@ type GreaseLibTargetOpts struct {
 	Format_pre_msg *string
 	Name *string  // not used by greaseLib - but used for a string reference name 
 	              // for the target ID
+	flags uint32
 }
 
+const GREASE_JSON_ESCAPE_STRINGS uint32 = C.GREASE_JSON_ESCAPE_STRINGS
+
+
+func TargetOptsSetFlags(opts *GreaseLibTargetOpts, flag uint32) {
+	opts.flags |= flag;
+}
 
 var nextOptsId uint32 = 0;
 //var mutexAddTargetMap = make(map[uint32]
@@ -421,10 +427,6 @@ func convertOptsToCGreaseLib(opts *GreaseLibTargetOpts) {
 		opts._binding.delim = C.CString(*opts.Delim)
 		opts._binding.len_delim = C.int(len(*opts.Delim))
 	}
-	if(opts.Delim_output != nil) {	
-		opts._binding.delim_output = C.CString(*opts.Delim_output)
-		opts._binding.len_delim_output = C.int(len(*opts.Delim_output))
-	}
 	if(opts.TTY != nil) {	
 		opts._binding.tty = C.CString(*opts.TTY)
 	}
@@ -460,6 +462,7 @@ func convertOptsToCGreaseLib(opts *GreaseLibTargetOpts) {
 		opts._binding.format_pre_msg = C.CString(*opts.Format_pre_msg)
 		opts._binding.format_pre_msg_len = C.int(len(*opts.Format_pre_msg))
 	}
+	C.GreaseLib_set_flag_GreaseLibTargetOpts(&opts._binding, C.uint32_t(opts.flags));
 }
 
 //export do_addTargetCB
