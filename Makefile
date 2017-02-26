@@ -67,6 +67,10 @@ $(OUTPUT_DIR)/%.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 
+bindings.a-debug: CFLAGS += -DDEBUG_BINDINGS
+bindings.a-debug: callbacks.o
+	$(AR) rcs bindings.a $^
+
 bindings.a: callbacks.o	
 	$(AR) rcs $@ $^ 
 
@@ -74,4 +78,5 @@ clean:
 	-rm -rf $(OUTPUT_DIR)/*.o $(OUTPUT_DIR)/*.obj $(OUTPUT_DIR)/*.rpo $(OUTPUT_DIR)/*.idb $(OUTPUT_DIR)/*.lib $(OUTPUT_DIR)/*.exe $(OUTPUT_DIR)/*.a $(OUTPUT_DIR)/*~ $(OUTPUT_DIR)/core
 	-rm -rf Debug
 	-rm -f $(TWSOLIBNAME) $(TWSONAME) $(TWSOVERSION)
+	-rm -f bindings.a
 # DO NOT DELETE
