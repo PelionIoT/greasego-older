@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-//	"sync"
+	"sync"
 //	"sync/atomic"	
 )
 
@@ -165,6 +165,7 @@ type addTargetCallbackData struct {
 }
 
 var addTargetCallbackMap map[int]*addTargetCallbackData
+var addTargetCallbackMapMutex sync.Mutex
 
 type TargetCallbackData struct {
 	buf *C.GreaseLibBuf
@@ -194,6 +195,7 @@ func (data *TargetCallbackData) GetBufferAsSlice() []byte {
 
 // used to map callback targets (targets which have or are a callback)
 var targetCallbackMap map[uint32]GreaseLibTargetCB
+var targetCallbackMapMutex sync.Mutex
 
 type GreaseLevel uint32
 
@@ -201,8 +203,9 @@ const GREASE_ALL_LEVELS GreaseLevel = 0xFFFFFFFF //C.GREASE_ALL_LEVELS
 
 func init() {
 	addTargetCallbackMap = map[int]*addTargetCallbackData{}
+	addTargetCallbackMapMutex = &sync.Mutex{}
 	targetCallbackMap = map[uint32]GreaseLibTargetCB{}
-
+	targetCallbackMapMutex = &sync.Mutex{}
 
 	TargetMap = GreaseIdMap{
 		"default" : C.GREASE_DEFAULT_TARGET_ID,  // default target ID is always 0
@@ -512,17 +515,22 @@ func do_addTargetCB(err *C.GreaseLibError, info *C.GreaseLibStartedTargetInfo) {
 		}
 		optsid = int((*info).optsId)
 //		fmt.Printf("HERE2222 do_addTargetCB %d\n",optsid)
-
+		addTargetCallbackMapMutex.Lock()
 		data := addTargetCallbackMap[optsid]
+		addTargetCallbackMapMutex.Unlock()
 
 		if data.targetCB != nil { // assign the target callback, if one is provided
+			targetCallbackMapMutex.Lock()
 			targetCallbackMap[uint32(info.targId)] = data.targetCB
+			targetCallbackMapMutex.Unlock()			
 		}
 
 		if data.addTargetCB != nil { // call the AddTarget callback 
 			                           // (the callback for the operation of adding a Target) 
 			data.addTargetCB(goerr,optsid,uint32(info.targId))
+			addTargetCallbackMapMutex.Lock()
 			delete(addTargetCallbackMap, optsid)
+			addTargetCallbackMapMutex.Unlock()			
 		} else {
 //			fmt.Printf("NO CALLBACK FOUND. optsid: %d\n",optsid)
 		}
@@ -543,16 +551,22 @@ func do_modifyDefaultTargetCB(err *C.GreaseLibError, info *C.GreaseLibStartedTar
 		optsid = int((*info).optsId)
 //		fmt.Printf("HERE2222 do_addTargetCB %d\n",optsid)
 
+		addTargetCallbackMapMutex.Lock()
 		data := addTargetCallbackMap[optsid]
+		addTargetCallbackMapMutex.Unlock()
 
 		if data.targetCB != nil { // assign the target callback, if one is provided
+			targetCallbackMapMutex.Lock()
 			targetCallbackMap[uint32(info.targId)] = data.targetCB
+			targetCallbackMapMutex.Unlock()
 		}
 
 		if data.addTargetCB != nil { // call the AddTarget callback 
 			                           // (the callback for the operation of adding a Target) 
 			data.addTargetCB(goerr,optsid,uint32(info.targId))
+			addTargetCallbackMapMutex.Lock()
 			delete(addTargetCallbackMap, optsid)
+			addTargetCallbackMapMutex.Unlock()
 		} else {
 //			fmt.Printf("NO CALLBACK FOUND. optsid: %d\n",optsid)
 		}
@@ -569,7 +583,9 @@ func NewGreaseLibTargetOpts() *GreaseLibTargetOpts {
 //export do_commonTargetCB
 func do_commonTargetCB(err *C.GreaseLibError, d *C.GreaseLibBuf, targetId C.uint32_t) {
 	// this gets called by C.greasego_commonTargetCallback
+	targetCallbackMapMutex.Lock()
 	cb := targetCallbackMap[uint32(targetId)]
+	targetCallbackMapMutex.Unlock()
 	if(cb != nil) {
 		data := new(TargetCallbackData)
 		data.buf = d;
@@ -599,7 +615,9 @@ func AddTarget(opts *GreaseLibTargetOpts, cb GreaseLibAddTargetCB) {
 	if cb != nil {
 		dat.addTargetCB = cb
 	}
+	addTargetCallbackMapMutex.Lock()
 	addTargetCallbackMap[optid] = dat;
+	addTargetCallbackMapMutex.Unlock()
 	C.greasego_wrapper_addTarget( &(opts._binding) )	// use the wrapper func
 }
 
