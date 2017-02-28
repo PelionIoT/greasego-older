@@ -165,7 +165,7 @@ type addTargetCallbackData struct {
 }
 
 var addTargetCallbackMap map[int]*addTargetCallbackData
-var addTargetCallbackMapMutex sync.Mutex
+var addTargetCallbackMapMutex *sync.Mutex
 
 type TargetCallbackData struct {
 	buf *C.GreaseLibBuf
@@ -195,7 +195,7 @@ func (data *TargetCallbackData) GetBufferAsSlice() []byte {
 
 // used to map callback targets (targets which have or are a callback)
 var targetCallbackMap map[uint32]GreaseLibTargetCB
-var targetCallbackMapMutex sync.Mutex
+var targetCallbackMapMutex *sync.Mutex
 
 type GreaseLevel uint32
 
@@ -203,9 +203,9 @@ const GREASE_ALL_LEVELS GreaseLevel = 0xFFFFFFFF //C.GREASE_ALL_LEVELS
 
 func init() {
 	addTargetCallbackMap = map[int]*addTargetCallbackData{}
-	addTargetCallbackMapMutex = &sync.Mutex{}
+	addTargetCallbackMapMutex = new(sync.Mutex)
 	targetCallbackMap = map[uint32]GreaseLibTargetCB{}
-	targetCallbackMapMutex = &sync.Mutex{}
+	targetCallbackMapMutex = new(sync.Mutex)
 
 	TargetMap = GreaseIdMap{
 		"default" : C.GREASE_DEFAULT_TARGET_ID,  // default target ID is always 0
