@@ -133,6 +133,7 @@ type GreaseLibTargetOpts struct {
 	Name *string  // not used by greaseLib - but used for a string reference name 
 	              // for the target ID
 	flags uint32
+	NumBanks uint32
 }
 
 const GREASE_JSON_ESCAPE_STRINGS uint32 = C.GREASE_JSON_ESCAPE_STRINGS
@@ -141,6 +142,7 @@ const GREASE_JSON_ESCAPE_STRINGS uint32 = C.GREASE_JSON_ESCAPE_STRINGS
 func TargetOptsSetFlags(opts *GreaseLibTargetOpts, flag uint32) {
 	opts.flags |= flag;
 }
+
 
 var nextOptsId uint32 = 0;
 //var mutexAddTargetMap = make(map[uint32]
@@ -172,18 +174,27 @@ type TargetCallbackData struct {
 	targId uint32
 }
 
+// after calling this function, the data, and any slice
+// form GetBufferAsSlice() is invalid
+func RetireCallbackData(data *TargetCallbackData) {
+	C.GreaseLib_cleanup_GreaseLibBuf(data.buf)
+}
+
+
 func (data *TargetCallbackData) GetBufferAsSlice() []byte {
 	// this technique avoids copying data - which would utterly suck
 	// https://www.cockroachlabs.com/blog/the-cost-and-complexity-of-cgo/
 	if(data.buf != nil) {
-		len := int(data.buf.size) // get len out of C structure
-		const maxLen = 0x7fffffff
-		if len > 0 {
-			if len < maxLen {
-					return (*[maxLen]byte)(unsafe.Pointer(data.buf.data))[:len:len]
+		_len := uint64((*data.buf).size) // get len out of C structure
+		const maxLen = uint64(0x7fffffff)
+		if _len > 0 {
+			if _len < maxLen {
+					return (*[maxLen]byte)(unsafe.Pointer(data.buf.data))[:_len:_len]
 				} else {
-					fmt.Println("OVERLOAD of zero-copy buffer - GetBufferAsSlice()")
-					return C.GoBytes(unsafe.Pointer(data.buf.data), C.int(data.buf.size))
+					fmt.Printf("@GetBufferAsSlice sanity check: %+v %d %d\n",data,_len, uint64(data.buf.size))
+					panic("OOPS - len is wrong")
+					// fmt.Printf("OVERLOAD of zero-copy buffer - GetBufferAsSlice() %+v %d\n",data,_len)
+					// return C.GoBytes(unsafe.Pointer(data.buf.data), C.int(data.buf.size))
 				}
 		} else {
 			return []byte{}
@@ -498,6 +509,9 @@ func convertOptsToCGreaseLib(opts *GreaseLibTargetOpts) {
 	if(opts.Format_pre_msg != nil) {	
 		opts._binding.format_pre_msg = C.CString(*opts.Format_pre_msg)
 		opts._binding.format_pre_msg_len = C.int(len(*opts.Format_pre_msg))
+	}
+	if(opts.NumBanks > 0) {
+		opts._binding.num_banks = C.uint32_t(opts.NumBanks)
 	}
 	C.GreaseLib_set_flag_GreaseLibTargetOpts(&opts._binding, C.uint32_t(opts.flags));
 }

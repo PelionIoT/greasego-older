@@ -8,7 +8,7 @@ package greasego
 /*
 #cgo LDFLAGS: -L/usr/lib/x86_64-linux-gnu -L${SRCDIR}/deps/lib
 #cgo LDFLAGS: -lgrease -luv -lTW -lre2 -lstdc++ -lm -ltcmalloc_minimal 
-#cgo CFLAGS: -I${SRCDIR}/deps/include 
+#cgo CFLAGS: -I${SRCDIR}/deps/include -DDEBUG_BINDINGS
 #define GREASE_IS_LOCAL 1
 #include <stdio.h>
 #include "grease_lib.h"
@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-//	"sync"
+	"sync"
 //	"sync/atomic"	
 )
 
@@ -135,6 +135,7 @@ type GreaseLibTargetOpts struct {
 	Name *string  // not used by greaseLib - but used for a string reference name 
 	              // for the target ID
 	flags uint32
+	NumBanks uint32
 }
 
 const GREASE_JSON_ESCAPE_STRINGS uint32 = C.GREASE_JSON_ESCAPE_STRINGS
@@ -143,6 +144,7 @@ const GREASE_JSON_ESCAPE_STRINGS uint32 = C.GREASE_JSON_ESCAPE_STRINGS
 func TargetOptsSetFlags(opts *GreaseLibTargetOpts, flag uint32) {
 	opts.flags |= flag;
 }
+
 
 var nextOptsId uint32 = 0;
 //var mutexAddTargetMap = make(map[uint32]
@@ -167,24 +169,34 @@ type addTargetCallbackData struct {
 }
 
 var addTargetCallbackMap map[int]*addTargetCallbackData
+var addTargetCallbackMapMutex *sync.Mutex
 
 type TargetCallbackData struct {
 	buf *C.GreaseLibBuf
 	targId uint32
 }
 
+// after calling this function, the data, and any slice
+// form GetBufferAsSlice() is invalid
+func RetireCallbackData(data *TargetCallbackData) {
+	C.GreaseLib_cleanup_GreaseLibBuf(data.buf)
+}
+
+
 func (data *TargetCallbackData) GetBufferAsSlice() []byte {
 	// this technique avoids copying data - which would utterly suck
 	// https://www.cockroachlabs.com/blog/the-cost-and-complexity-of-cgo/
 	if(data.buf != nil) {
-		len := int(data.buf.size) // get len out of C structure
-		const maxLen = 0x7fffffff
-		if len > 0 {
-			if len < maxLen {
-					return (*[maxLen]byte)(unsafe.Pointer(data.buf.data))[:len:len]
+		_len := uint64((*data.buf).size) // get len out of C structure
+		const maxLen = uint64(0x7fffffff)
+		if _len > 0 {
+			if _len < maxLen {
+					return (*[maxLen]byte)(unsafe.Pointer(data.buf.data))[:_len:_len]
 				} else {
-					fmt.Println("OVERLOAD of zero-copy buffer - GetBufferAsSlice()")
-					return C.GoBytes(unsafe.Pointer(data.buf.data), C.int(data.buf.size))
+					fmt.Printf("@GetBufferAsSlice sanity check: %+v %d %d\n",data,_len, uint64(data.buf.size))
+					panic("OOPS - len is wrong")
+					// fmt.Printf("OVERLOAD of zero-copy buffer - GetBufferAsSlice() %+v %d\n",data,_len)
+					// return C.GoBytes(unsafe.Pointer(data.buf.data), C.int(data.buf.size))
 				}
 		} else {
 			return []byte{}
@@ -196,6 +208,7 @@ func (data *TargetCallbackData) GetBufferAsSlice() []byte {
 
 // used to map callback targets (targets which have or are a callback)
 var targetCallbackMap map[uint32]GreaseLibTargetCB
+var targetCallbackMapMutex *sync.Mutex
 
 type GreaseLevel uint32
 
@@ -203,8 +216,9 @@ const GREASE_ALL_LEVELS GreaseLevel = 0xFFFFFFFF //C.GREASE_ALL_LEVELS
 
 func init() {
 	addTargetCallbackMap = map[int]*addTargetCallbackData{}
+	addTargetCallbackMapMutex = new(sync.Mutex)
 	targetCallbackMap = map[uint32]GreaseLibTargetCB{}
-
+	targetCallbackMapMutex = new(sync.Mutex)
 
 	TargetMap = GreaseIdMap{
 		"default" : C.GREASE_DEFAULT_TARGET_ID,  // default target ID is always 0
@@ -279,7 +293,7 @@ func do_startGreaseLib_cb() {
 func StartGreaseLib(cb GreaseLibStartCB) {
 	_instance := getGreaseLib()
 	_instance._greaseLibStartCB = cb	
-	
+	fmt.Printf("calling GreaseLib_start()\n")
 	C.GreaseLib_start((C.GreaseLibCallback)(unsafe.Pointer(C.greasego_startGreaseLibCB)));
 }
 
@@ -292,7 +306,7 @@ func findTypeByTag(tag string,	in interface{}) reflect.Type {
 		found := field.Tag.Get("greaseType")
 //		fmt.Println("found greaseType tag of",found)
 		if(len(found) > 0 && strings.Compare(found, tag) == 0) {
-			
+			fmt.Println("Found template type of",field.Type," - tag:",tag)
 			return field.Type
 		}
 	}	
@@ -321,9 +335,9 @@ func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) 
 							val := reflect.New(fieldType)
 							val.Elem().Set(fieldval)
 							if(len(fieldval.String()) > 0) {
-								
+								fmt.Println("Will assign:",fieldval.String())
 								if(reflect.ValueOf(opts).Elem().FieldByName(alias).CanSet()) {
-									 
+									 fmt.Printf("Set string Ptr value to <%s>\n",val.Elem().String())
 									 reflect.ValueOf(opts).Elem().FieldByName(alias).Set(val)
 								} else {
 									fmt.Println("ERROR: No valid field of name:",alias)
@@ -344,7 +358,7 @@ func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) 
 	//			}
 			} else {
 	
-				
+				fmt.Println("here1")
 				
 				switch field.Type.Kind() {
 					case reflect.Int:
@@ -375,12 +389,12 @@ func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) 
 									//							val := reflect.New(fieldType)
 		//							val.Elem().Set(fieldval)
 									if(len(fieldval.String()) > 0) { // if it's a string, make sure it's not empty
-										
+										fmt.Println("Will assign:",fieldval.String(),"to",alias)
 										if(assignToField.IsValid()){
-											
+											fmt.Println("valid field")
 										}
 										if(assignToField.CanSet()) {
-											 
+											 fmt.Printf("Set value to <%s>\n",fieldval.String())
 											 assignToField.Set(fieldval)
 										} else {
 											fmt.Println("ERROR: No valid field of name:",alias)
@@ -398,7 +412,7 @@ func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) 
 							}
 //						}				
 					case reflect.Ptr:
-						
+						fmt.Println("PTR found - in reflection")
 	
 						if(fieldval.IsValid()) {
 							fieldval = fieldval.Elem()
@@ -416,7 +430,7 @@ func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) 
 								if strct_name != "" {
 									strct_orig := reflect.ValueOf(obj).FieldByName(field.Name)						
 									if(strct_orig.IsValid()) {
-										
+										fmt.Println("@struct - recurse and New (",field.Name," - ",strct_name,")")
 										if(reflect.ValueOf(opts).Elem().FieldByName(strct_name).IsValid()) {
 											if(reflect.ValueOf(opts).Elem().FieldByName(strct_name).IsNil()) {
 		//										fmt.Println("but field is nil")											
@@ -436,7 +450,7 @@ func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) 
 												AssignFromStruct(inner_opts,strct_orig.Interface()) //, strct_orig.Type())																			
 											}
 										} else {
-											
+											fmt.Println("inner - not valid")
 										}
 									}
 				
@@ -451,7 +465,7 @@ func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) 
 		}
 		
 	}
-	
+	fmt.Println("exit assign")
 }
 
 
@@ -498,6 +512,9 @@ func convertOptsToCGreaseLib(opts *GreaseLibTargetOpts) {
 		opts._binding.format_pre_msg = C.CString(*opts.Format_pre_msg)
 		opts._binding.format_pre_msg_len = C.int(len(*opts.Format_pre_msg))
 	}
+	if(opts.NumBanks > 0) {
+		opts._binding.num_banks = C.uint32_t(opts.NumBanks)
+	}
 	C.GreaseLib_set_flag_GreaseLibTargetOpts(&opts._binding, C.uint32_t(opts.flags));
 }
 
@@ -514,17 +531,22 @@ func do_addTargetCB(err *C.GreaseLibError, info *C.GreaseLibStartedTargetInfo) {
 		}
 		optsid = int((*info).optsId)
 //		fmt.Printf("HERE2222 do_addTargetCB %d\n",optsid)
-
+		addTargetCallbackMapMutex.Lock()
 		data := addTargetCallbackMap[optsid]
+		addTargetCallbackMapMutex.Unlock()
 
 		if data.targetCB != nil { // assign the target callback, if one is provided
+			targetCallbackMapMutex.Lock()
 			targetCallbackMap[uint32(info.targId)] = data.targetCB
+			targetCallbackMapMutex.Unlock()			
 		}
 
 		if data.addTargetCB != nil { // call the AddTarget callback 
 			                           // (the callback for the operation of adding a Target) 
 			data.addTargetCB(goerr,optsid,uint32(info.targId))
+			addTargetCallbackMapMutex.Lock()
 			delete(addTargetCallbackMap, optsid)
+			addTargetCallbackMapMutex.Unlock()			
 		} else {
 //			fmt.Printf("NO CALLBACK FOUND. optsid: %d\n",optsid)
 		}
@@ -545,16 +567,22 @@ func do_modifyDefaultTargetCB(err *C.GreaseLibError, info *C.GreaseLibStartedTar
 		optsid = int((*info).optsId)
 //		fmt.Printf("HERE2222 do_addTargetCB %d\n",optsid)
 
+		addTargetCallbackMapMutex.Lock()
 		data := addTargetCallbackMap[optsid]
+		addTargetCallbackMapMutex.Unlock()
 
 		if data.targetCB != nil { // assign the target callback, if one is provided
+			targetCallbackMapMutex.Lock()
 			targetCallbackMap[uint32(info.targId)] = data.targetCB
+			targetCallbackMapMutex.Unlock()
 		}
 
 		if data.addTargetCB != nil { // call the AddTarget callback 
 			                           // (the callback for the operation of adding a Target) 
 			data.addTargetCB(goerr,optsid,uint32(info.targId))
+			addTargetCallbackMapMutex.Lock()
 			delete(addTargetCallbackMap, optsid)
+			addTargetCallbackMapMutex.Unlock()
 		} else {
 //			fmt.Printf("NO CALLBACK FOUND. optsid: %d\n",optsid)
 		}
@@ -571,7 +599,9 @@ func NewGreaseLibTargetOpts() *GreaseLibTargetOpts {
 //export do_commonTargetCB
 func do_commonTargetCB(err *C.GreaseLibError, d *C.GreaseLibBuf, targetId C.uint32_t) {
 	// this gets called by C.greasego_commonTargetCallback
+	targetCallbackMapMutex.Lock()
 	cb := targetCallbackMap[uint32(targetId)]
+	targetCallbackMapMutex.Unlock()
 	if(cb != nil) {
 		data := new(TargetCallbackData)
 		data.buf = d;
@@ -601,7 +631,9 @@ func AddTarget(opts *GreaseLibTargetOpts, cb GreaseLibAddTargetCB) {
 	if cb != nil {
 		dat.addTargetCB = cb
 	}
+	addTargetCallbackMapMutex.Lock()
 	addTargetCallbackMap[optid] = dat;
+	addTargetCallbackMapMutex.Unlock()
 	C.greasego_wrapper_addTarget( &(opts._binding) )	// use the wrapper func
 }
 

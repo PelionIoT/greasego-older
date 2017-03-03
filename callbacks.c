@@ -8,10 +8,10 @@
 #undef DBG_OUT
 #endif
 
-#define ERROR_OUT(s,...) fprintf(stderr, "**ERROR** " s, ##__VA_ARGS__ )//#define ERROR_PERROR(s,...) fprintf(stderr, "*****ERROR***** " s, ##__VA_ARGS__ );
+#define ERROR_OUT(s,...) fprintf(stderr, "**ERROR_CGO** (callbacks.c)" s, ##__VA_ARGS__ )//#define ERROR_PERROR(s,...) fprintf(stderr, "*****ERROR***** " s, ##__VA_ARGS__ );
 
 #ifdef DEBUG_BINDINGS
-#define DBG_OUT(s,...) fprintf(stderr, "**DEBUG** " s "\n", ##__VA_ARGS__ )
+#define DBG_OUT(s,...) fprintf(stderr, "**DEBUG_CGO (callbacks.c)** " s "\n", ##__VA_ARGS__ )
 #define IF_DBG( x ) { x }
 #else
 #define DBG_OUT(s,...) {}
@@ -26,6 +26,7 @@ int greasego_startGreaseLibCB(int in)
 }
 
 void greasego_commonTargetCB(GreaseLibError *err, void *d, uint32_t targetId) {
+	DBG_OUT("@greasego_commonTargetCB (err:%x) %d",err,targetId);
 	return do_commonTargetCB(err, (GreaseLibBuf *)d, targetId);
 }
 
