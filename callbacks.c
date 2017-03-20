@@ -19,31 +19,36 @@
 #endif
 
 // The gateway function
-int greasego_startGreaseLibCB(int in)
+void greasego_startGreaseLibCB(int in)
 {
     DBG_OUT("gateway func: greasego_startGreaseLibCB()\n");
-    return do_startGreaseLib_cb();
+    do_startGreaseLib_cb();
 }
 
 void greasego_commonTargetCB(GreaseLibError *err, void *d, uint32_t targetId) {
-	DBG_OUT("@greasego_commonTargetCB (err:%x) %d",err,targetId);
-	return do_commonTargetCB(err, (GreaseLibBuf *)d, targetId);
+	DBG_OUT("@greasego_commonTargetCB (err:%p) %d",err,targetId);
+	do_commonTargetCB(err, (GreaseLibBuf *)d, targetId);
 }
 
 
 // this is a GreaseLibCallback for addTarget
-int greasego_addTargetCB(GreaseLibError *err, void *d) {
+void greasego_addTargetCB(GreaseLibError *err, void *d) {
 	if(d) {
 		GreaseLibStartedTargetInfo *info = 	(GreaseLibStartedTargetInfo *) d;
 		DBG_OUT("HERE - in addTargetCB %d\n",info->optsId);		
-		return do_addTargetCB(err,info);
+		do_addTargetCB(err,info);
 	}
 
 }
 
 int greasego_wrapper_addTarget(GreaseLibTargetOpts *opts) {
 	DBG_OUT("HERE - in grease_go_wrapper_addTarget\n");
-	GreaseLib_addTarget( greasego_addTargetCB, opts );
+	GreaseLib_addTarget( (GreaseLibCallback) greasego_addTargetCB, opts );
+	return 0;
+}
+
+void greasego_childClosedFDCallback (GreaseLibError *err, int stream_type, int fd) {
+	do_childClosedFDCallback(err, stream_type, fd);
 }
 
 

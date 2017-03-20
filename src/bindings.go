@@ -760,4 +760,34 @@ func AddSink(sink *GreaseLibSink) int {
 	return ret	
 }
 
+type GreaseLibProcessClosedRedirectCallback func(err *GreaseError, stream_type int, pid int)
+
+var closedRedirectCB GreaseLibProcessClosedRedirectCallback
+
+func AssignChildClosedFDCallback( cb GreaseLibProcessClosedRedirectCallback) {
+	closedRedirectCB = cb
+}
+
+//export do_childClosedFDCallback
+func do_childClosedFDCallback(err *C.GreaseLibError, stream_type C.int, fd C.int) {
+	goerr := convertCGreaseError(err)
+	closedRedirectCB(goerr,int(stream_type),int(fd))
+}
+
+func AddFDForStdout(fd int, originId uint32) {
+	C.GreaseLib_addFDForStdout( C.int(fd), C.uint32_t(originId), C.GreaseLibProcessClosedRedirect(C.greasego_childClosedFDCallback) )	
+}
+
+func AddFDForStderr(fd int, originId uint32) {
+	C.GreaseLib_addFDForStderr( C.int(fd), C.uint32_t(originId), C.GreaseLibProcessClosedRedirect(C.greasego_childClosedFDCallback) )	
+}
+
+
+func RemoveFDForStderr(fd int) {
+	C.GreaseLib_removeFDForStderr(C.int(fd))
+}
+func RemoveFDForStdout(fd int) {
+	C.GreaseLib_removeFDForStdout(C.int(fd))
+}
+
 
