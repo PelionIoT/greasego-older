@@ -59,7 +59,7 @@ type GreaseError struct {
 	Errno int
 }
 
-func convertCGreaseError(err *C.GreaseLibError) *GreaseError {
+func ConvertCGreaseError(err *C.GreaseLibError) *GreaseError {
 	if(err == nil) {
 		return nil
 	}
@@ -523,7 +523,7 @@ func do_addTargetCB(err *C.GreaseLibError, info *C.GreaseLibStartedTargetInfo) {
 //	fmt.Println("HERE1111 do_addTargetCB")
 	if(info != nil) {
 //	fmt.Printf("opts -----------> %+v\n", *info)
-		goerr := convertCGreaseError(err)
+		goerr := ConvertCGreaseError(err)
 		if(goerr != nil) {
 			fmt.Printf("Error on Callback: %d\n",goerr.Errno)
 		}
@@ -558,7 +558,7 @@ func do_modifyDefaultTargetCB(err *C.GreaseLibError, info *C.GreaseLibStartedTar
 //	fmt.Println("HERE1111 do_addTargetCB")
 	if(info != nil) {
 //	fmt.Printf("opts -----------> %+v\n", *info)
-		goerr := convertCGreaseError(err)
+		goerr := ConvertCGreaseError(err)
 		if(goerr != nil) {
 			fmt.Printf("Error on Callback: %d\n",goerr.Errno)
 		}
@@ -606,7 +606,7 @@ func do_commonTargetCB(err *C.GreaseLibError, d *C.GreaseLibBuf, targetId C.uint
 		data.targId = uint32(targetId)
 		var goerr *GreaseError
 		if(err != nil) {
-			goerr = convertCGreaseError(err)
+			goerr = ConvertCGreaseError(err)
 		}
 		cb(goerr,data)
 	}
@@ -770,8 +770,17 @@ func AssignChildClosedFDCallback( cb GreaseLibProcessClosedRedirectCallback) {
 
 //export do_childClosedFDCallback
 func do_childClosedFDCallback(err *C.GreaseLibError, stream_type C.int, fd C.int) {
-	goerr := convertCGreaseError(err)
-	closedRedirectCB(goerr,int(stream_type),int(fd))
+	goerr := ConvertCGreaseError(err)
+	if closedRedirectCB != nil {
+		closedRedirectCB(goerr,int(stream_type),int(fd))
+	}
+}
+
+func init() {
+	// this setups the default redirect callback to always be the above one.
+	// So the bindings here will handle the close whenever a redirected stderr/stdout closes
+	// if no specific callback was handed in at AddFDForStdout() / Stderr()
+	C.GreaseLib_addDefaultRedirectorClosedCB(  C.GreaseLibProcessClosedRedirect(C.greasego_childClosedFDCallback) )
 }
 
 func AddFDForStdout(fd int, originId uint32) {
