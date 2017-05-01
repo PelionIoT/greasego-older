@@ -320,6 +320,24 @@ func findTypeByTag(tag string,	in interface{}) reflect.Type {
 }
 
 
+func AddLevelLabel(val uint32, label string) {
+	cstr := C.CString(label)
+	clen := C.strlen(cstr)
+	C.GreaseLib_addLevelLabel(C.uint32_t(val), cstr, C.int(clen))
+}
+
+func AddTagLabel(val uint32, label string) {
+	cstr := C.CString(label)
+	clen := C.strlen(cstr)
+	C.GreaseLib_addTagLabel(C.uint32_t(val), cstr, C.int(clen))
+}
+
+func AddOriginLabel(val uint32, label string) {
+	cstr := C.CString(label)
+	clen := C.strlen(cstr)
+	C.GreaseLib_addOriginLabel(C.uint32_t(val), cstr, C.int(clen))
+}
+
 // Assigns values to a struct based on StructTags of `greaseAssign` and `greaseType`
 // Not that with string, this always assumes the structure it will fill will have a *string, not a string
 func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) {
