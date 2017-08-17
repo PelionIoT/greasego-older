@@ -51,4 +51,47 @@ void greasego_childClosedFDCallback (GreaseLibError *err, int stream_type, int f
 	do_childClosedFDCallback(err, stream_type, fd);
 }
 
+void zero_meta( logMeta *m ) {
+	memset(m,0,sizeof(logMeta));
+}
 
+
+logMeta go_meta_info = {
+		.tag = GREASE_TAG_INTERNAL,
+		.level = GREASE_LEVEL_INFO,
+		.origin = 0,
+		.target = 0,
+		.extras = 0,
+		__DEFAULT_LOG_META_PRIVATE };
+
+logMeta go_meta_warning = {
+		.tag = GREASE_TAG_INTERNAL,
+		.level = GREASE_LEVEL_WARN,
+		.origin = 0,
+		.target = 0,
+		.extras = 0,
+		__DEFAULT_LOG_META_PRIVATE };
+
+logMeta go_meta_error = {
+		.tag = GREASE_TAG_INTERNAL,
+		.level = GREASE_LEVEL_ERROR,
+		.origin = 0,
+		.target = 0,
+		.extras = 0,
+		__DEFAULT_LOG_META_PRIVATE };
+
+logMeta go_meta_debug = {
+		.tag = GREASE_TAG_INTERNAL,
+		.level = GREASE_LEVEL_DEBUG,
+		.origin = 0,
+		.target = 0,
+		.extras = 0,
+		__DEFAULT_LOG_META_PRIVATE };
+
+logMeta go_meta_success = {
+		.tag = GREASE_TAG_INTERNAL,
+		.level = GREASE_LEVEL_SUCCESS,
+		.origin = 0,
+		.target = 0,
+		.extras = 0,
+		__DEFAULT_LOG_META_PRIVATE };

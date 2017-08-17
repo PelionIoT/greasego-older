@@ -61,7 +61,7 @@ type GreaseError struct {
 	Errno int
 }
 
-func convertCGreaseError(err *C.GreaseLibError) *GreaseError {
+func ConvertCGreaseError(err *C.GreaseLibError) *GreaseError {
 	if(err == nil) {
 		return nil
 	}
@@ -238,7 +238,9 @@ func init() {
 		"info" : C.GREASE_LEVEL_INFO,
 		"trace" : C.GREASE_LEVEL_TRACE,
 	}
-	
+
+
+	// defined in grease_common_tags.h
 	DefaultTagMap = GreaseIdMap{
 		"stdout" : C.GREASE_TAG_STDOUT,
 		"stderr" : C.GREASE_TAG_STDERR,
@@ -274,6 +276,12 @@ func init() {
 		"sys-local7" : uint32(C.GREASE_RESERVED_TAGS_SYS_LOCAL7),
 		
 	}
+
+	// this setups the default redirect callback to always be the above one.
+	// So the bindings here will handle the close whenever a redirected stderr/stdout closes
+	// if no specific callback was handed in at AddFDForStdout() / Stderr()
+	C.GreaseLib_addDefaultRedirectorClosedCB(  C.GreaseLibProcessClosedRedirect(C.greasego_childClosedFDCallback) )
+
 }
 	
 //func init() {
@@ -311,6 +319,25 @@ func findTypeByTag(tag string,	in interface{}) reflect.Type {
 		}
 	}	
 	return nil
+}
+
+
+func AddLevelLabel(val uint32, label string) {
+	cstr := C.CString(label)
+	clen := C.strlen(cstr)
+	C.GreaseLib_addLevelLabel(C.uint32_t(val), cstr, C.int(clen))
+}
+
+func AddTagLabel(val uint32, label string) {
+	cstr := C.CString(label)
+	clen := C.strlen(cstr)
+	C.GreaseLib_addTagLabel(C.uint32_t(val), cstr, C.int(clen))
+}
+
+func AddOriginLabel(val uint32, label string) {
+	cstr := C.CString(label)
+	clen := C.strlen(cstr)
+	C.GreaseLib_addOriginLabel(C.uint32_t(val), cstr, C.int(clen))
 }
 
 // Assigns values to a struct based on StructTags of `greaseAssign` and `greaseType`
@@ -525,7 +552,7 @@ func do_addTargetCB(err *C.GreaseLibError, info *C.GreaseLibStartedTargetInfo) {
 //	fmt.Println("HERE1111 do_addTargetCB")
 	if(info != nil) {
 //	fmt.Printf("opts -----------> %+v\n", *info)
-		goerr := convertCGreaseError(err)
+		goerr := ConvertCGreaseError(err)
 		if(goerr != nil) {
 			fmt.Printf("Error on Callback: %d\n",goerr.Errno)
 		}
@@ -560,7 +587,7 @@ func do_modifyDefaultTargetCB(err *C.GreaseLibError, info *C.GreaseLibStartedTar
 //	fmt.Println("HERE1111 do_addTargetCB")
 	if(info != nil) {
 //	fmt.Printf("opts -----------> %+v\n", *info)
-		goerr := convertCGreaseError(err)
+		goerr := ConvertCGreaseError(err)
 		if(goerr != nil) {
 			fmt.Printf("Error on Callback: %d\n",goerr.Errno)
 		}
@@ -608,7 +635,7 @@ func do_commonTargetCB(err *C.GreaseLibError, d *C.GreaseLibBuf, targetId C.uint
 		data.targId = uint32(targetId)
 		var goerr *GreaseError
 		if(err != nil) {
-			goerr = convertCGreaseError(err)
+			goerr = ConvertCGreaseError(err)
 		}
 		cb(goerr,data)
 	}
@@ -761,5 +788,111 @@ func AddSink(sink *GreaseLibSink) int {
 	}
 	return ret	
 }
+
+type GreaseLibProcessClosedRedirectCallback func(err *GreaseError, stream_type int, pid int)
+
+var closedRedirectCB GreaseLibProcessClosedRedirectCallback
+
+func AssignChildClosedFDCallback( cb GreaseLibProcessClosedRedirectCallback) {
+	closedRedirectCB = cb
+}
+
+//export do_childClosedFDCallback
+func do_childClosedFDCallback(err *C.GreaseLibError, stream_type C.int, fd C.int) {
+	goerr := ConvertCGreaseError(err)
+	if closedRedirectCB != nil {
+		closedRedirectCB(goerr,int(stream_type),int(fd))
+	}
+}
+
+func AddFDForStdout(fd int, originId uint32) {
+	C.GreaseLib_addFDForStdout( C.int(fd), C.uint32_t(originId), C.GreaseLibProcessClosedRedirect(C.greasego_childClosedFDCallback) )	
+}
+
+func AddFDForStderr(fd int, originId uint32) {
+	C.GreaseLib_addFDForStderr( C.int(fd), C.uint32_t(originId), C.GreaseLibProcessClosedRedirect(C.greasego_childClosedFDCallback) )	
+}
+
+
+func RemoveFDForStderr(fd int) {
+	C.GreaseLib_removeFDForStderr(C.int(fd))
+}
+func RemoveFDForStdout(fd int) {
+	C.GreaseLib_removeFDForStdout(C.int(fd))
+}
+
+func SetInternalTagName(name string) {
+	
+}
+
+func SetInternalLogOrigin(originid uint32, name string) {
+//	internal_origin = C.uint32_t(originid)
+
+}
+
+func LogError(a ...interface{}) {
+	out := fmt.Sprint(a...)
+	C.GreaseLib_logCharBuffer( &C.go_meta_error, C.CString(out), C.int(len(out)) )
+}
+
+func LogErrorf(format string, a ...interface{}) {
+	out := fmt.Sprintf(format,a...)
+	C.GreaseLib_logCharBuffer( &C.go_meta_error, C.CString(out), C.int(len(out)) )
+}
+
+func LogWarning(a ...interface{}) {
+	out := fmt.Sprint(a...)
+	C.GreaseLib_logCharBuffer( &C.go_meta_warning, C.CString(out), C.int(len(out)) )
+}
+
+func LogWarningf(format string, a ...interface{}) {
+	out := fmt.Sprintf(format,a...)
+	C.GreaseLib_logCharBuffer( &C.go_meta_warning, C.CString(out), C.int(len(out)) )
+}
+
+func LogInfo(a ...interface{}) {
+	out := fmt.Sprint(a...)
+	C.GreaseLib_logCharBuffer( &C.go_meta_info, C.CString(out), C.int(len(out)) )
+}
+
+func LogInfof(format string, a ...interface{}) {
+	out := fmt.Sprintf(format,a...)
+	C.GreaseLib_logCharBuffer( &C.go_meta_info, C.CString(out), C.int(len(out)) )
+}
+
+func LogDebug(a ...interface{}) {
+	out := fmt.Sprint(a...)
+	C.GreaseLib_logCharBuffer( &C.go_meta_debug, C.CString(out), C.int(len(out)) )
+}
+
+func LogDebugf(format string, a ...interface{}) {
+	out := fmt.Sprintf(format,a...)
+	C.GreaseLib_logCharBuffer( &C.go_meta_debug, C.CString(out), C.int(len(out)) )
+}
+
+func LogSuccess(a ...interface{}) {
+	out := fmt.Sprint(a...)
+	C.GreaseLib_logCharBuffer( &C.go_meta_success, C.CString(out), C.int(len(out)) )
+}
+
+func LogSucessf(format string, a ...interface{}) {
+	out := fmt.Sprintf(format,a...)
+	C.GreaseLib_logCharBuffer( &C.go_meta_success, C.CString(out), C.int(len(out)) )
+}
+
+func GetUnusedTagId() (goret uint32) {
+	var ret C.uint32_t
+	C.GreaseLib_getUnusedTagId( &ret )
+	goret = uint32(ret)
+	return
+}
+
+func GetUnusedOriginId() (goret uint32) {
+	var ret C.uint32_t
+	C.GreaseLib_getUnusedOriginId( &ret )
+	goret = uint32(ret)
+	return
+}
+
 
 
