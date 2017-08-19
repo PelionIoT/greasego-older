@@ -25,8 +25,10 @@ if [ ! -d $GREASE_LIB ]; then
 fi
 
 cd $GREASE_LIB
-git pull
-git checkout $GREASE_LIB_BRANCH
+if [ -d ".git" ]; then
+    git pull
+    git checkout $GREASE_LIB_BRANCH
+fi
 
 if [ "$1" != "skipdeps" ]; then
     echo ">>>>>>>>> Building libgrease dependencies..."

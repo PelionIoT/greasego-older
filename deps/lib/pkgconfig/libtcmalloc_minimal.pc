@@ -1,0 +1,13 @@
+prefix=/home/ed/work/gostuff/src/github.com/WigWagCo/greasego/deps/src/greaseLib/deps/build
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: gperftools
+Version: 2.4
+Description: Performance tools for C++
+URL: http://code.google.com/p/gperftools/
+Requires:
+Libs: -L${libdir} -ltcmalloc_minimal
+Libs.private: -pthread -lpthread
+Cflags: -I${includedir}
