@@ -27,7 +27,7 @@ if [ ! -z "$PRETEND" ]; then
 fi
 
 
-for f in $(find  src -name '*.go'); do
+for f in $(find "./src" -name '*.go'); do
 	echo "--> "$f
 #	echo `basename $f`
 	FILENAME=`basename $f`
