@@ -3,3 +3,8 @@
 /config.status
 /Makefile
 /confdefs.h
+/heap-checker_debug_unittest
+/heap-checker_unittest
+/memalign_debug_unittest
+/memalign_unittest
+/tcmalloc_both_unittest
