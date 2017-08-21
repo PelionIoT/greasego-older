@@ -70,6 +70,8 @@ if [ -e libgrease.so.1 ]; then
     cp libgrease.so.1 $SELF/deps/lib
     cp *.h $SELF/deps/include
     echo ">>>>>>>>> Success. libgrease.so.1 ready."
+    cd $SELF/deps/lib
+    ln -s libgrease.so.1 libgrease.so 
 else
     echo ">>>>>>>>> ERROR: libgrease.so.1 missing or not built."
 fi
