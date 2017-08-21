@@ -1,14 +1,11 @@
-// Generated source file. 
-// Edit files in 'src' folder    
 package greasego
-
 
 // see notes here on libtcmalloc issues: https://github.com/gperftools/gperftools/issues/39
 
 /*
-#cgo LDFLAGS: -L/usr/lib/x86_64-linux-gnu -L${SRCDIR}/deps/lib
+#cgo LDFLAGS: -L${SRCDIR}/deps/lib
 #cgo LDFLAGS: -lgrease -luv -lTW -lre2 -lstdc++ -lm -ltcmalloc_minimal 
-#cgo CFLAGS: -I${SRCDIR}/deps/include 
+#cgo CFLAGS: -I${SRCDIR}/deps/include DEBUG(-DDEBUG_BINDINGS)
 #define GREASE_IS_LOCAL 1
 #include <stdio.h>
 #include "grease_lib.h"
@@ -26,22 +23,6 @@ import (
 	"sync"
 //	"sync/atomic"	
 )
-
-//-static-libgcc 
-// # cgo LDFLAGS: /usr/lib/x86_64-linux-gnu/libunwind-coredump.so.0 
-
-// I can't get this to work right now. I think when the fix for cgo command is put in it will:
-// https://github.com/golang/go/issues/16651
-/*
-# cgo LDFLAGS: -L/usr/lib/gcc/x86_64-linux-gnu/4.8
-# cgo LDFLAGS: -L/usr/lib/x86_64-linux-gnu -Wl,-Bdynamic /usr/lib/x86_64-linux-gnu/libunwind-coredump.so.0 -Wl,-Bstatic 
-# cgo LDFLAGS: -Wl,-whole-archive ${SRCDIR}/deps/lib/libtcmalloc_minimal.a -Wl,-no-whole-archive 
-# cgo LDFLAGS: /usr/lib/gcc/x86_64-linux-gnu/4.8.4/libstdc++.a ${SRCDIR}/deps/lib/libgrease.a ${SRCDIR}/deps/lib/libuv.a ${SRCDIR}/deps/lib/libTW.a ${SRCDIR}/deps/lib/libre2.a  -lstdc++ /usr/lib/x86_64-linux-gnu/libm.a
-# cgo CFLAGS: -I${SRCDIR}/deps/include
-# define GREASE_IS_LOCAL 1
-# include "grease_lib.h"
-*/
-
 
 const GREASE_LIB_OK int = 0
 const GREASE_LIB_NOT_FOUND int = 0x01E00000
@@ -301,7 +282,7 @@ func do_startGreaseLib_cb() {
 func StartGreaseLib(cb GreaseLibStartCB) {
 	_instance := getGreaseLib()
 	_instance._greaseLibStartCB = cb	
-	
+	DEBUG(fmt.Printf("calling GreaseLib_start()\n"))
 	C.GreaseLib_start((C.GreaseLibCallback)(unsafe.Pointer(C.greasego_startGreaseLibCB)));
 }
 
@@ -314,7 +295,7 @@ func findTypeByTag(tag string,	in interface{}) reflect.Type {
 		found := field.Tag.Get("greaseType")
 //		fmt.Println("found greaseType tag of",found)
 		if(len(found) > 0 && strings.Compare(found, tag) == 0) {
-			
+			DEBUG(fmt.Println("Found template type of",field.Type," - tag:",tag))
 			return field.Type
 		}
 	}	
@@ -362,9 +343,9 @@ func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) 
 							val := reflect.New(fieldType)
 							val.Elem().Set(fieldval)
 							if(len(fieldval.String()) > 0) {
-								
+								DEBUG(fmt.Println("Will assign:",fieldval.String()))
 								if(reflect.ValueOf(opts).Elem().FieldByName(alias).CanSet()) {
-									 
+									 DEBUG(fmt.Printf("Set string Ptr value to <%s>\n",val.Elem().String()))
 									 reflect.ValueOf(opts).Elem().FieldByName(alias).Set(val)
 								} else {
 									fmt.Println("ERROR: No valid field of name:",alias)
@@ -385,7 +366,7 @@ func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) 
 	//			}
 			} else {
 	
-				
+				DEBUG(fmt.Println("here1"))
 				
 				switch field.Type.Kind() {
 					case reflect.Int:
@@ -416,12 +397,12 @@ func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) 
 									//							val := reflect.New(fieldType)
 		//							val.Elem().Set(fieldval)
 									if(len(fieldval.String()) > 0) { // if it's a string, make sure it's not empty
-										
+										DEBUG(fmt.Println("Will assign:",fieldval.String(),"to",alias))
 										if(assignToField.IsValid()){
-											
+											DEBUG(fmt.Println("valid field"))
 										}
 										if(assignToField.CanSet()) {
-											 
+											 DEBUG(fmt.Printf("Set value to <%s>\n",fieldval.String()))
 											 assignToField.Set(fieldval)
 										} else {
 											fmt.Println("ERROR: No valid field of name:",alias)
@@ -439,7 +420,7 @@ func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) 
 							}
 //						}				
 					case reflect.Ptr:
-						
+						DEBUG(fmt.Println("PTR found - in reflection"))
 	
 						if(fieldval.IsValid()) {
 							fieldval = fieldval.Elem()
@@ -457,7 +438,7 @@ func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) 
 								if strct_name != "" {
 									strct_orig := reflect.ValueOf(obj).FieldByName(field.Name)						
 									if(strct_orig.IsValid()) {
-										
+										DEBUG(fmt.Println("@struct - recurse and New (",field.Name," - ",strct_name,")"))
 										if(reflect.ValueOf(opts).Elem().FieldByName(strct_name).IsValid()) {
 											if(reflect.ValueOf(opts).Elem().FieldByName(strct_name).IsNil()) {
 		//										fmt.Println("but field is nil")											
@@ -477,7 +458,7 @@ func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) 
 												AssignFromStruct(inner_opts,strct_orig.Interface()) //, strct_orig.Type())																			
 											}
 										} else {
-											
+											DEBUG(fmt.Println("inner - not valid"))
 										}
 									}
 				
@@ -492,7 +473,7 @@ func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) 
 		}
 		
 	}
-	
+	DEBUG(fmt.Println("exit assign"))
 }
 
 
