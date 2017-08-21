@@ -45,6 +45,8 @@ rm -f *.o *.a
 # on the client logging code
 make libgrease.a-server
 make libgrease.so.1
+cp *.h $SELF/deps/include
+
 
 if [ -e libgrease.a ]; then
     # migrate all of the greaselib dependencies up to the folder Go will use

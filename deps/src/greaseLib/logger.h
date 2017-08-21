@@ -2182,6 +2182,9 @@ protected:
 		bool _disabled;
 	public:
 		const uint32_t JSON_ESCAPE_STRINGS = GREASE_JSON_ESCAPE_STRINGS;
+		// this strips string of their SGR and similar escpae codes
+		const uint32_t STRIP_ANSI_ESCAPE_CODES = GREASE_STRIP_ANSI_ESCAPE_CODES;
+
 		typedef void (*targetReadyCB)(bool ready, _errcmn::err_ev &err, logTarget *t);
 		targetReadyCB readyCB;
 		target_start_info *readyData;
@@ -3591,6 +3594,11 @@ protected:
 	int _log(const logMeta &meta, const char *s, int len); // internal log cmd
 	int _logSync(const logMeta &meta, const char *s, int len); // internal log cmd
 
+	// these two function should be used in close proximity
+	int _grabInLogBuffer(singleLog* &buf);
+	int _submitBuffer(singleLog *buf);
+	int _returnBuffer(singleLog *buf);
+
 	void start(actionCB cb, target_start_info *data);
 	int logFromRaw(char *base, int len);
 
@@ -3672,6 +3680,8 @@ protected:
 	LIB_METHOD_SYNC_FRIEND(disableTarget, TargetId id);
 	LIB_METHOD_SYNC_FRIEND(enableTarget, TargetId id);
 	LIB_METHOD_SYNC_FRIEND(flush, TargetId id);
+	friend void ::_greaseLib_handle_stdoutFd_cb(uv_poll_t *handle, int status, int events);
+	friend void ::_greaseLib_handle_stderrFd_cb(uv_poll_t *handle, int status, int events);
 	friend GreaseLibTargetOpts* ::GreaseLib_new_GreaseLibTargetOpts(void);
 	friend GreaseLibTargetOpts* ::GreaseLib_init_GreaseLibTargetOpts(GreaseLibTargetOpts *);
 	friend void ::GreaseLib_cleanup_GreaseLibBuf(GreaseLibBuf *b);

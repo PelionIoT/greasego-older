@@ -8,7 +8,7 @@ package greasego
 /*
 #cgo LDFLAGS: -L/usr/lib/x86_64-linux-gnu -L${SRCDIR}/deps/lib
 #cgo LDFLAGS: -lgrease -luv -lTW -lre2 -lstdc++ -lm -ltcmalloc_minimal 
-#cgo CFLAGS: -I${SRCDIR}/deps/include -DDEBUG_BINDINGS
+#cgo CFLAGS: -I${SRCDIR}/deps/include 
 #define GREASE_IS_LOCAL 1
 #include <stdio.h>
 #include "grease_lib.h"
@@ -301,7 +301,7 @@ func do_startGreaseLib_cb() {
 func StartGreaseLib(cb GreaseLibStartCB) {
 	_instance := getGreaseLib()
 	_instance._greaseLibStartCB = cb	
-	fmt.Printf("calling GreaseLib_start()\n")
+	
 	C.GreaseLib_start((C.GreaseLibCallback)(unsafe.Pointer(C.greasego_startGreaseLibCB)));
 }
 
@@ -314,7 +314,7 @@ func findTypeByTag(tag string,	in interface{}) reflect.Type {
 		found := field.Tag.Get("greaseType")
 //		fmt.Println("found greaseType tag of",found)
 		if(len(found) > 0 && strings.Compare(found, tag) == 0) {
-			fmt.Println("Found template type of",field.Type," - tag:",tag)
+			
 			return field.Type
 		}
 	}	
@@ -362,9 +362,9 @@ func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) 
 							val := reflect.New(fieldType)
 							val.Elem().Set(fieldval)
 							if(len(fieldval.String()) > 0) {
-								fmt.Println("Will assign:",fieldval.String())
+								
 								if(reflect.ValueOf(opts).Elem().FieldByName(alias).CanSet()) {
-									 fmt.Printf("Set string Ptr value to <%s>\n",val.Elem().String())
+									 
 									 reflect.ValueOf(opts).Elem().FieldByName(alias).Set(val)
 								} else {
 									fmt.Println("ERROR: No valid field of name:",alias)
@@ -385,7 +385,7 @@ func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) 
 	//			}
 			} else {
 	
-				fmt.Println("here1")
+				
 				
 				switch field.Type.Kind() {
 					case reflect.Int:
@@ -416,12 +416,12 @@ func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) 
 									//							val := reflect.New(fieldType)
 		//							val.Elem().Set(fieldval)
 									if(len(fieldval.String()) > 0) { // if it's a string, make sure it's not empty
-										fmt.Println("Will assign:",fieldval.String(),"to",alias)
+										
 										if(assignToField.IsValid()){
-											fmt.Println("valid field")
+											
 										}
 										if(assignToField.CanSet()) {
-											 fmt.Printf("Set value to <%s>\n",fieldval.String())
+											 
 											 assignToField.Set(fieldval)
 										} else {
 											fmt.Println("ERROR: No valid field of name:",alias)
@@ -439,7 +439,7 @@ func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) 
 							}
 //						}				
 					case reflect.Ptr:
-						fmt.Println("PTR found - in reflection")
+						
 	
 						if(fieldval.IsValid()) {
 							fieldval = fieldval.Elem()
@@ -457,7 +457,7 @@ func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) 
 								if strct_name != "" {
 									strct_orig := reflect.ValueOf(obj).FieldByName(field.Name)						
 									if(strct_orig.IsValid()) {
-										fmt.Println("@struct - recurse and New (",field.Name," - ",strct_name,")")
+										
 										if(reflect.ValueOf(opts).Elem().FieldByName(strct_name).IsValid()) {
 											if(reflect.ValueOf(opts).Elem().FieldByName(strct_name).IsNil()) {
 		//										fmt.Println("but field is nil")											
@@ -477,7 +477,7 @@ func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) 
 												AssignFromStruct(inner_opts,strct_orig.Interface()) //, strct_orig.Type())																			
 											}
 										} else {
-											fmt.Println("inner - not valid")
+											
 										}
 									}
 				
@@ -492,7 +492,7 @@ func AssignFromStruct(opts interface{},obj interface{}) { //, typ reflect.Type) 
 		}
 		
 	}
-	fmt.Println("exit assign")
+	
 }
 
 
