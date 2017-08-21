@@ -27,7 +27,9 @@ if [ ! -z "$PRETEND" ]; then
 fi
 
 
-for f in $(find "./src" -name '*.go'); do
+#for f in $(find "./src" -name '*.go'); do
+# the above find statement is wigging out bitbake for some reason
+for f in $(ls src/*.go); do
 	echo "--> "$f
 #	echo `basename $f`
 	FILENAME=`basename $f`
