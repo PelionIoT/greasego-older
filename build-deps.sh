@@ -72,6 +72,7 @@ if [ -e libgrease.so.1 ]; then
     echo ">>>>>>>>> Success. libgrease.so.1 ready."
     cd $SELF/deps/lib
     ln -s libgrease.so.1 libgrease.so 
+    echo ">>>>>>>>> Success. libgrease.so link ready."
 else
     echo ">>>>>>>>> ERROR: libgrease.so.1 missing or not built."
 fi
