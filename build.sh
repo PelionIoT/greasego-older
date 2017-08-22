@@ -62,13 +62,16 @@ fi
 
 pushd $THIS_DIR
 
-make clean
-if [ ! -z "$DEBUG" ]; then
-	make bindings.a-debug
-else
-	make bindings.a
-fi
-go build github.com/WigWagCo/greasego
-go install github.com/WigWagCo/greasego
+if [ "$1" != "preprocess_only" ]; then
 
-popd
+	make clean
+	if [ ! -z "$DEBUG" ]; then
+		make bindings.a-debug
+	else
+		make bindings.a
+	fi
+	go build github.com/WigWagCo/greasego
+	go install github.com/WigWagCo/greasego
+
+	popd
+fi
