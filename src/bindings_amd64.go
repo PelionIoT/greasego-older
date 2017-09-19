@@ -873,7 +873,7 @@ func LogSuccess(a ...interface{}) {
 	C.GreaseLib_logCharBuffer( &C.go_meta_success, C.CString(out), C.int(len(out)) )
 }
 
-func LogSucessf(format string, a ...interface{}) {
+func LogSuccessf(format string, a ...interface{}) {
 	out := fmt.Sprintf(format,a...)
 	C.GreaseLib_logCharBuffer( &C.go_meta_success, C.CString(out), C.int(len(out)) )
 }
