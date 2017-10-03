@@ -8,6 +8,9 @@
 #undef DBG_OUT
 #endif
 
+// an origin ID which uniquely identifies the logger's own process
+#define GREASEGO_SELF_ORIGIN_ID 101
+
 #define ERROR_OUT(s,...) fprintf(stderr, "**ERROR_CGO** (callbacks.c)" s, ##__VA_ARGS__ )//#define ERROR_PERROR(s,...) fprintf(stderr, "*****ERROR***** " s, ##__VA_ARGS__ );
 
 #ifdef DEBUG_BINDINGS
@@ -55,6 +58,11 @@ void zero_meta( logMeta *m ) {
 	memset(m,0,sizeof(logMeta));
 }
 
+void greasego_setSelfOriginLabel(char *s) {
+	if (s) {
+		GreaseLib_addOriginLabel((uint32_t)GREASEGO_SELF_ORIGIN_ID, s, strlen(s));
+	}
+}
 
 logMeta go_meta_info = {
 		.tag = GREASE_TAG_INTERNAL,
@@ -92,6 +100,46 @@ logMeta go_meta_success = {
 		.tag = GREASE_TAG_INTERNAL,
 		.level = GREASE_LEVEL_SUCCESS,
 		.origin = 0,
+		.target = 0,
+		.extras = 0,
+		__DEFAULT_LOG_META_PRIVATE };
+
+logMeta go_self_meta_info = {
+		.tag = GREASE_TAG_INTERNAL,
+		.level = GREASE_LEVEL_INFO,
+		.origin = GREASEGO_SELF_ORIGIN_ID,
+		.target = 0,
+		.extras = 0,
+		__DEFAULT_LOG_META_PRIVATE };
+
+logMeta go_self_meta_warning = {
+		.tag = GREASE_TAG_INTERNAL,
+		.level = GREASE_LEVEL_WARN,
+		.origin = GREASEGO_SELF_ORIGIN_ID,
+		.target = 0,
+		.extras = 0,
+		__DEFAULT_LOG_META_PRIVATE };
+
+logMeta go_self_meta_error = {
+		.tag = GREASE_TAG_INTERNAL,
+		.level = GREASE_LEVEL_ERROR,
+		.origin = GREASEGO_SELF_ORIGIN_ID,
+		.target = 0,
+		.extras = 0,
+		__DEFAULT_LOG_META_PRIVATE };
+
+logMeta go_self_meta_debug = {
+		.tag = GREASE_TAG_INTERNAL,
+		.level = GREASE_LEVEL_DEBUG,
+		.origin = GREASEGO_SELF_ORIGIN_ID,
+		.target = 0,
+		.extras = 0,
+		__DEFAULT_LOG_META_PRIVATE };
+
+logMeta go_self_meta_success = {
+		.tag = GREASE_TAG_INTERNAL,
+		.level = GREASE_LEVEL_SUCCESS,
+		.origin = GREASEGO_SELF_ORIGIN_ID,
 		.target = 0,
 		.extras = 0,
 		__DEFAULT_LOG_META_PRIVATE };
