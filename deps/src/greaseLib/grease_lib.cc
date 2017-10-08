@@ -120,6 +120,8 @@ uv_mutex_t tagGenLock;
 GreaseLibProcessClosedRedirect defaultRedirectorClosedCB = NULL;
 
 class fdRedirectorTicket final {
+protected:
+	bool _isValid;
 public:
 	uint32_t origin;
 	uint32_t tag;
@@ -129,9 +131,14 @@ public:
 	uv_poll_t handle;
 	GreaseLibProcessClosedRedirect cb;
 	fdRedirectorTicket() = delete;
-	fdRedirectorTicket(uint32_t o, int _fd, GreaseLibProcessClosedRedirect _cb): origin(o), tag(0), level(0), fd(_fd), closed(false), cb(_cb) {
-		uv_poll_init(&libLoop, &handle, fd); // NOTE: this should set the descriptor to non-blocking mode
+	fdRedirectorTicket(uint32_t o, int _fd, GreaseLibProcessClosedRedirect _cb): _isValid(false), origin(o), tag(0), level(0), fd(_fd), closed(false), cb(_cb) {
+		if(!ww_alt_uv_poll_init(&libLoop, &handle, fd)) {  // NOTE: this should set the descriptor to non-blocking mode
+			_isValid = true;
+		}
 		handle.data = this;
+	}
+	bool isValid() {
+		return _isValid;
 	}
 	void close() {
 		if(!closed) {
@@ -1243,6 +1250,9 @@ LIB_METHOD_SYNC(flush, TargetId id) {
 LIB_METHOD_SYNC(addFDForStdout,int fd, uint32_t originId, GreaseLibProcessClosedRedirect cb) {
 	fdRedirectorTicket *data = new fdRedirectorTicket(originId, fd, cb);
 	fdRedirectorTicket *old = NULL;
+	if(!data->isValid()){
+		ERROR_OUT("addFDForStdout() --> redirector ticket is not valid!!");
+	}
 	stdoutRedirectTable->addReplace(fd,data,old);
 	if(old) {
 		delete old;
@@ -1263,6 +1273,9 @@ LIB_METHOD_SYNC(addDefaultRedirectorClosedCB, GreaseLibProcessClosedRedirect cb)
 LIB_METHOD_SYNC(addFDForStderr,int fd, uint32_t originId, GreaseLibProcessClosedRedirect cb) {
 	fdRedirectorTicket *data = new fdRedirectorTicket(originId, fd, cb);
 	fdRedirectorTicket *old = NULL;
+	if(!data->isValid()){
+		ERROR_OUT("addFDForStderr() --> redirector ticket is not valid!!");
+	}
 	stderrRedirectTable->addReplace(fd,data,old);
 	if(old) {
 		// we don't close it b/c its the same number as the incoming
