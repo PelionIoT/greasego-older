@@ -168,22 +168,27 @@ int uv__io_check_fd(uv_loop_t* loop, int fd) {
 
 // alternate WigWag version which does not do the abort()
 int ww_alt_uv__io_check_fd(uv_loop_t* loop, int fd) {
-  struct uv__epoll_event e;
-  int rc;
+//  struct uv__epoll_event e;
+  int rc = 0;
 
-  e.events = POLLIN;
-  e.data = -1;
-
-  rc = 0;
-  if (uv__epoll_ctl(loop->backend_fd, UV__EPOLL_CTL_ADD, fd, &e))
-    if (errno != EEXIST)
-      rc = -errno;
-
-  // no abort() on failure, just report back fail
-  if (rc == 0)
-    if (uv__epoll_ctl(loop->backend_fd, UV__EPOLL_CTL_DEL, fd, &e))
-      rc = -errno;
-
+  // see: https://stackoverflow.com/questions/12340695/how-to-check-if-a-given-file-descriptor-stored-in-a-variable-is-still-valid
+  rc = fcntl(fd, F_GETFD);
+  if (rc == -1) {
+	  rc = errno;
+  }
+//  e.events = POLLIN;
+//  e.data = -1;
+//
+//  rc = 0;
+//  if (uv__epoll_ctl(loop->backend_fd, UV__EPOLL_CTL_ADD, fd, &e))
+//    if (errno != EEXIST)
+//      rc = -errno;
+//
+//  // no abort() on failure, just report back fail
+//  if (rc == 0)
+//    if (uv__epoll_ctl(loop->backend_fd, UV__EPOLL_CTL_DEL, fd, &e))
+//      rc = -errno;
+//
   return rc;
 }
 

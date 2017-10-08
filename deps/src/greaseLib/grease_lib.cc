@@ -1252,13 +1252,16 @@ LIB_METHOD_SYNC(addFDForStdout,int fd, uint32_t originId, GreaseLibProcessClosed
 	fdRedirectorTicket *old = NULL;
 	if(!data->isValid()){
 		ERROR_OUT("addFDForStdout() --> redirector ticket is not valid!!");
+		delete data;
+		return GREASE_LIB_INTERNAL_ERROR;
+	} else {
+		stdoutRedirectTable->addReplace(fd,data,old);
+		if(old) {
+			delete old;
+		}
+		data->startPoll(_greaseLib_handle_stdoutFd_cb);
+		return GREASE_LIB_OK;
 	}
-	stdoutRedirectTable->addReplace(fd,data,old);
-	if(old) {
-		delete old;
-	}
-	data->startPoll(_greaseLib_handle_stdoutFd_cb);
-	return GREASE_LIB_OK;
 }
 
 LIB_METHOD_SYNC(addDefaultRedirectorClosedCB, GreaseLibProcessClosedRedirect cb) {
@@ -1275,15 +1278,16 @@ LIB_METHOD_SYNC(addFDForStderr,int fd, uint32_t originId, GreaseLibProcessClosed
 	fdRedirectorTicket *old = NULL;
 	if(!data->isValid()){
 		ERROR_OUT("addFDForStderr() --> redirector ticket is not valid!!");
+		delete data;
+		return GREASE_LIB_INTERNAL_ERROR;
+	} else {
+		stderrRedirectTable->addReplace(fd,data,old);
+		if(old) {
+			delete old;
+		}
+		data->startPoll(_greaseLib_handle_stderrFd_cb);
+		return GREASE_LIB_OK;
 	}
-	stderrRedirectTable->addReplace(fd,data,old);
-	if(old) {
-		// we don't close it b/c its the same number as the incoming
-		// this should never happen
-		delete old;
-	}
-	data->startPoll(_greaseLib_handle_stderrFd_cb);
-	return GREASE_LIB_OK;
 }
 
 LIB_METHOD_SYNC(removeFDForStdout,int fd) {

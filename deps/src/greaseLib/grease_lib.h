@@ -21,7 +21,8 @@
 #define GREASE_PATH_MAX        4096
 
 #define GREASE_LIB_OK 0
-#define GREASE_LIB_NOT_FOUND 0x01E00000
+#define GREASE_LIB_NOT_FOUND      0x01E00000
+#define GREASE_LIB_INTERNAL_ERROR 0x01E00001
 
 #define LIB_METHOD( name, ... ) int GreaseLib_##name( GreaseLibCallback libCB, ## __VA_ARGS__ )
 #define LIB_METHOD_FRIEND( name, ... ) friend int ::GreaseLib_##name( GreaseLibCallback libCB, ## __VA_ARGS__ )
