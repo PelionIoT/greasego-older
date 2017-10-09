@@ -1922,7 +1922,7 @@ bool GreaseLogger::parse_single_devklog_to_singleLog(char *start, int &remain, k
 				if (*look == ',') {
 					*look = '\0';  // make it NULL, so we can capture the string
 
-					if(look == cap + 1) { // there should be only 1 digit
+					if(look == cap + 1 || look == cap + 2) { // there should be only 1 or 2, digit
 						if(*cap == 'c') {
 							// this is a continuation line. Special case.
 							// TODO
@@ -1938,11 +1938,18 @@ bool GreaseLogger::parse_single_devklog_to_singleLog(char *start, int &remain, k
 								entry->meta.m.level = GREASE_KLOGLEVEL_TO_LEVEL_MAP[klog_level];
 								state = TIME_STAMP_BEGIN;
 							} else {
-								state = INVALID;
+								// ?? dunno, something new, move on - use default
+								entry->meta.m.level = GREASE_KLOG_DEFAULT_LEVEL;
+								state = TIME_STAMP_BEGIN;
 							}
 						}
-					} else { // else, there was nothing in LEVEL brackets
-						state = INVALID;
+					} else { // else, there was nothing confusing, skip to body - use default level
+						if (*look == ';') { // in this case,
+							entry->meta.m.level = GREASE_KLOG_DEFAULT_LEVEL;
+							state = BODY_BEGIN;
+						}
+
+//						state = INVALID;
 					}
 				}
 				break;
