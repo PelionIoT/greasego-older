@@ -489,6 +489,7 @@ const TagId GREASE_RESERVED_TAGS_NATIVE = GREASE_NATIVE_TAG;
 const char *GREASE_STD_LABEL_SYSLOG = "syslog";
 const char *GREASE_STD_LABEL_STDOUT = "stdout";
 const char *GREASE_STD_LABEL_STDERR = "stderr";
+const char *GREASE_STD_LABEL_KERNEL = "kernel";
 // these pair with syslog.h common 'facilities'
 const char *GREASE_STD_LABEL_SYS_AUTH = "sys-auth";
 const char *GREASE_STD_LABEL_SYS_AUTHPRIV = "sys-authpriv";
@@ -512,6 +513,7 @@ const char *GREASE_STD_LABEL_SYS_LOCAL4 = "sys-local4";
 const char *GREASE_STD_LABEL_SYS_LOCAL5 = "sys-local5";
 const char *GREASE_STD_LABEL_SYS_LOCAL6 = "sys-local6";
 const char *GREASE_STD_LABEL_SYS_LOCAL7 = "sys-local7";
+
 
 const char *GREASE_STD_LABEL_GREASE_ECHO = "grease-echo";
 
@@ -562,6 +564,7 @@ LIB_METHOD_SYNC(setupStandardTags) {
 	GreaseLib_addTagLabel(GREASE_TAG_SYSLOG,GREASE_STD_LABEL_SYSLOG,strlen(GREASE_STD_LABEL_SYSLOG));
 	GreaseLib_addTagLabel(GREASE_TAG_STDOUT,GREASE_STD_LABEL_STDOUT,strlen(GREASE_STD_LABEL_STDOUT));
 	GreaseLib_addTagLabel(GREASE_TAG_STDERR,GREASE_STD_LABEL_STDERR,strlen(GREASE_STD_LABEL_STDERR));
+	GreaseLib_addTagLabel(GREASE_TAG_KERNEL,GREASE_STD_LABEL_KERNEL,strlen(GREASE_STD_LABEL_KERNEL));
 	GreaseLib_addTagLabel(GREASE_RESERVED_TAGS_ECHO,GREASE_STD_LABEL_GREASE_ECHO,strlen(GREASE_STD_LABEL_GREASE_ECHO));
 	// stuff to log syslog stuff sensibly
 	GREASE_ADD_RES_TAG_N_LABEL( SYS_AUTH );
@@ -1060,14 +1063,18 @@ GreaseLibSink *GreaseLib_new_GreaseLibSink(uint32_t sink_type, const char *path)
 	GreaseLibSink *ret = (GreaseLibSink *) ::malloc(sizeof(GreaseLibSink));
 	::memset(ret,0,sizeof(GreaseLibSink));
 	ret->sink_type = sink_type;
-	::strncpy(ret->path,path,GREASE_PATH_MAX);
+	if(path) {
+		::strncpy(ret->path,path,GREASE_PATH_MAX);
+	}
 	return ret;
 }
 
 GreaseLibSink *GreaseLib_init_GreaseLibSink(GreaseLibSink *ret, uint32_t sink_type, const char *path) {
 	::memset(ret,0,sizeof(GreaseLibSink));
 	ret->sink_type = sink_type;
-	::strncpy(ret->path,path,GREASE_PATH_MAX);
+	if(path) {
+		::strncpy(ret->path,path,GREASE_PATH_MAX);
+	}
 	return ret;
 }
 
@@ -1116,7 +1123,33 @@ LIB_METHOD_SYNC(addSink,GreaseLibSink *sink) {
 		newsink->start();
 
 		l->sinks.addReplace(sink->id,base);
-	} else {
+	} else if (sink->sink_type == GREASE_LIB_SINK_KLOG) {
+		uv_mutex_lock(&l->nextIdMutex);
+		sink->id = l->nextSinkId++;
+		uv_mutex_unlock(&l->nextIdMutex);
+
+		GreaseLogger::KernelProcKmsgSink *newsink = new GreaseLogger::KernelProcKmsgSink(l, sink->id, l->loggerLoop);
+		GreaseLogger::Sink *base = dynamic_cast<GreaseLogger::Sink *>(newsink);
+
+		newsink->bind();
+		newsink->start();
+
+		l->sinks.addReplace(sink->id,base);
+	} else if (sink->sink_type == GREASE_LIB_SINK_KLOG2) {
+		uv_mutex_lock(&l->nextIdMutex);
+		sink->id = l->nextSinkId++;
+		uv_mutex_unlock(&l->nextIdMutex);
+
+		GreaseLogger::KernelProcKmsg2Sink *newsink = new GreaseLogger::KernelProcKmsg2Sink(l, sink->id, l->loggerLoop);
+		GreaseLogger::Sink *base = dynamic_cast<GreaseLogger::Sink *>(newsink);
+
+		newsink->bind();
+		newsink->start();
+
+		l->sinks.addReplace(sink->id,base);
+	}
+
+	else {
 		return GREASE_INVALID_PARAMS;
 	}
 	return GREASE_LIB_OK;

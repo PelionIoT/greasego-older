@@ -206,6 +206,8 @@ LIB_METHOD_SYNC(enableFilter,GreaseLibFilter *filter);
 #define GREASE_LIB_SINK_UNIXDGRAM 0x1
 #define GREASE_LIB_SINK_PIPE 0x2
 #define GREASE_LIB_SINK_SYSLOGDGRAM 0x3
+#define GREASE_LIB_SINK_KLOG 0x4  // kernel ring-buffer sink
+#define GREASE_LIB_SINK_KLOG2 0x5  // kernel ring-buffer sink - post kernel 3.5
 
 typedef struct {
 	char path[GREASE_PATH_MAX];
@@ -224,6 +226,10 @@ LIB_METHOD_SYNC(enableTarget, TargetId id);
 LIB_METHOD_SYNC(flush, TargetId id);
 
 extern const TagId GREASE_SYSLOGFAC_TO_TAG_MAP[22];
+extern const LevelMask GREASE_KLOGLEVEL_TO_LEVEL_MAP[8];
+extern const LevelMask GREASE_KLOG_DEFAULT_LEVEL;
+
+
 
 #define GREASE_PROCESS_STDOUT 1
 #define GREASE_PROCESS_STDERR 2
