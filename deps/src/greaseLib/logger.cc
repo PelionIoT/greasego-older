@@ -1932,8 +1932,14 @@ bool GreaseLogger::parse_single_devklog_to_singleLog(char *start, int &remain, k
 							entry->meta.m.level = GREASE_KLOG_DEFAULT_LEVEL;
 							state = TIME_STAMP_BEGIN;
 						} else {
-							klog_level = *cap - '0';
-							if (klog_level < 8 && klog_level >= 0) {
+							if(look == cap + 1)
+								klog_level = *cap - '0';
+							else if (*cap == '1')
+								klog_level = *(cap+1) - '0' + 10;
+							else
+								klog_level = 20;
+
+							if (klog_level < 20 && klog_level >= 0) {
 								// valid level
 								entry->meta.m.level = GREASE_KLOGLEVEL_TO_LEVEL_MAP[klog_level];
 								state = TIME_STAMP_BEGIN;
