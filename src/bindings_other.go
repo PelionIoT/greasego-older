@@ -1,5 +1,6 @@
-package greasego
+// +build arm arm64
 
+package greasego
 // see notes here on libtcmalloc issues: https://github.com/gperftools/gperftools/issues/39
 
 /*
@@ -227,6 +228,7 @@ func init() {
 		"stdout" : C.GREASE_TAG_STDOUT,
 		"stderr" : C.GREASE_TAG_STDERR,
 		"syslog" : C.GREASE_TAG_SYSLOG,
+		"kernel" : C.GREASE_TAG_KERNEL,
 		// deviceJS specific tags - defined in grease_lib.cc
 		"console" : C.GREASE_CONSOLE_TAG,
 		"native" : C.GREASE_NATIVE_TAG,
@@ -754,6 +756,8 @@ func EnableFilter(opts *GreaseLibFilter) int {
 const GREASE_LIB_SINK_UNIXDGRAM uint32  = 0x1
 const GREASE_LIB_SINK_PIPE uint32 = 0x2
 const GREASE_LIB_SINK_SYSLOGDGRAM uint32 = 0x3
+const GREASE_LIB_SINK_KLOG uint32 = 0x4
+const GREASE_LIB_SINK_KLOG2 uint32 = 0x5
 
 
 type GreaseLibSink struct {
@@ -763,7 +767,10 @@ type GreaseLibSink struct {
 
 func NewGreaseLibSink(sinkType uint32, path *string) *GreaseLibSink {
 	sink := new(GreaseLibSink)
-	temppath := C.CString(*path)
+	var temppath *C.char
+	if path != nil {
+		temppath = C.CString(*path)
+	}
 	C.GreaseLib_init_GreaseLibSink(&sink._binding,	C.uint32_t(sinkType), temppath) 
 	return sink
 } 
