@@ -608,7 +608,7 @@ func do_modifyDefaultTargetCB(err *C.GreaseLibError, info *C.GreaseLibStartedTar
 
 func NewGreaseLibTargetOpts() *GreaseLibTargetOpts {
 	ret := new(GreaseLibTargetOpts)
-	C.GreaseLib_init_GreaseLibTargetOpts(unsafe.Pointer(&ret._binding)) // init it to the library defaults
+	C.GreaseLib_init_GreaseLibTargetOpts(&ret._binding) // init it to the library defaults
 	return ret
 }
 
@@ -707,7 +707,7 @@ const GREASE_LIB_SET_FILTER_MASK   uint32 = 0x8
 
 func NewGreaseLibFilter() *GreaseLibFilter {
 	ret := new(GreaseLibFilter)
-	C.GreaseLib_init_GreaseLibTargetOpts(unsafe.Pointer(&ret._binding)) // init it to the library defaults
+	C.GreaseLib_init_GreaseLibFilter(&ret._binding) // init it to the library defaults
 	
 	ret.Mask = uint32(ret._binding.mask)
 	ret.Origin = uint32(ret._binding.origin)
@@ -725,7 +725,7 @@ func SetFilterValue(filter *GreaseLibFilter, flag uint32, val uint32) {
 
 func convertFilterToCGreaseLib(opts *GreaseLibFilter) {
 	if(!opts._isInit) {
-		C.GreaseLib_init_GreaseLibTargetOpts(unsafe.Pointer(&opts._binding)) // init it to the library defaults
+		C.GreaseLib_init_GreaseLibFilter(&opts._binding) // init it to the library defaults
 	}
 	if(opts.Format_pre != nil) {	
 		opts._binding.format_pre = C.CString(*opts.Format_pre)
