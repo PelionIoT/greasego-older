@@ -1343,7 +1343,7 @@ protected:
 			while(sink->ready && !sink->stop_thread) {
 				int err = select(n,&readfds,NULL,NULL,NULL); // block and wait...
 				if(err == -1) {
-					ERROR_PERROR("UnixDgramSink: error on select() \n", errno);
+					ERROR_PERROR("SyslogDgramSink: error on select() \n", errno);
 				} else if(err > 0) {
 					if(FD_ISSET(sink->wakeup_pipe[PIPE_WAIT], &readfds)) {
 						while(read(sink->wakeup_pipe[PIPE_WAIT], dump, 1) == 1) {}
@@ -1448,6 +1448,7 @@ protected:
 
 							} else {
 								DBG_OUT("syslog in %d ZERO length",iov_n );
+								break;
 							}
 						}
 
