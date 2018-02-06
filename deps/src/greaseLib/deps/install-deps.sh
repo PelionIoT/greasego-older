@@ -14,7 +14,7 @@ GPERF_DIR=${DEPS_DIR}/gperftools-2.4
 LIBUV_DIR=${DEPS_DIR}/libuv-v1.10.1
 LIBTW_DIR=${DEPS_DIR}/twlib
 #PCRE_DIR=${DEPS_DIR}/pcre2-10.22  # not used
-RE2_DIR=${DEPS_DIR}/re2-2017-01-01
+#RE2_DIR=${DEPS_DIR}/re2-2017-01-01
 
 rm -f $LOG
 mkdir -p ${DEPS_DIR}/build
@@ -84,10 +84,10 @@ popd
 #make install
 #popd
 
-pushd $RE2_DIR
-make
-make install prefix=${DEPS_DIR}/build
-popd
+# pushd $RE2_DIR
+# make
+# make install prefix=${DEPS_DIR}/build
+# popd
 
 
 pushd $LIBTW_DIR

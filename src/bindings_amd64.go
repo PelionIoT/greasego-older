@@ -5,7 +5,7 @@ package greasego
 
 /*
 #cgo LDFLAGS: -L/usr/lib/x86_64-linux-gnu -L${SRCDIR}/deps/lib
-#cgo LDFLAGS: -lgrease -luv -lTW -lre2 -lstdc++ -lm -ltcmalloc_minimal 
+#cgo LDFLAGS: -lgrease -luv -lTW -lstdc++ -lm -ltcmalloc_minimal 
 #cgo CFLAGS: -I${SRCDIR}/deps/include DEBUG(-DDEBUG_BINDINGS)
 #define GREASE_IS_LOCAL 1
 #include <stdio.h>

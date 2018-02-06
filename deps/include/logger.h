@@ -68,7 +68,7 @@ using namespace v8;
 
 #include <gperftools/tcmalloc.h>
 
-#include <re2/re2.h>
+//#include <re2/re2.h>
 #include <string>
 //#define PCRE2_CODE_UNIT_WIDTH 8
 //#include <pcre2.h>
@@ -1077,130 +1077,6 @@ protected:
 
 	class SyslogDgramSink final : public Sink, virtual public heapBuf::heapBufManager  {
 	protected:
-//		TWlib::tw_safeCircular<heapBuf *, LoggerAlloc > buffers;
-//		struct UnixDgramClient {
-////			char temp[SINK_BUFFER_SIZE];
-//			enum _state {
-//				NEED_PREAMBLE,
-//				IN_PREAMBLE,
-//				IN_LOG_ENTRY    // have log_entry_size
-//			};
-//			int temp_used;
-//			int state_remain;
-//			int log_entry_size;
-//			_state state;
-//			uv_pipe_t client;
-//			UnixDgramSink *self;
-//			UnixDgramClient() = delete;
-//			UnixDgramClient(UnixDgramSink *_self) :
-//				temp_used(0),
-//				state_remain(GREASE_CLIENT_HEADER_SIZE),  // the initial state requires preamble + size(uint32_t)
-//				log_entry_size(0),
-//				state(NEED_PREAMBLE), self(_self) {
-//				uv_pipe_init(_self->loop, &client, 0);
-//				client.data = this;
-//			}
-//			void resetState() {
-//				state = NEED_PREAMBLE;
-//				state_remain = GREASE_CLIENT_HEADER_SIZE;
-//				temp_used = 0;
-//				log_entry_size = 0;
-//			}
-//			void close() {
-//
-//			}
-//			static void on_close(uv_handle_t *t) {
-//				PipeClient *c = (PipeClient *) t->data;
-//				delete c;
-//			}
-//			static void on_read(uv_stream_t* handle, ssize_t nread, uv_buf_t buf) {
-//				PipeClient *c = (PipeClient *) handle->data;
-//				if(nread == -1) {
-//					// time to shutdown - client left...
-//					uv_close((uv_handle_t *)&c->client, PipeClient::on_close);
-//					DBG_OUT("UnixDgramSink client disconnect.\n");
-//				} else {
-//					int walk = 0;
-//					while(walk < buf.len) {
-//						switch(c->state) {
-//							case NEED_PREAMBLE:
-//								if(buf.len >= GREASE_CLIENT_HEADER_SIZE) {
-//									if(IS_SINK_PREAMBLE(buf.base)) {
-//										c->state = IN_LOG_ENTRY;
-//										GET_SIZE_FROM_PREAMBLE(buf.base,c->log_entry_size);
-//									} else {
-//										DBG_OUT("PipeClient: Bad state. resetting.\n");
-//										c->resetState();
-//									}
-//									walk += GREASE_CLIENT_HEADER_SIZE;
-//								} else {
-//									c->state_remain = SIZEOF_SINK_LOG_PREAMBLE - buf.len;
-//									memcpy(c->temp+c->temp_used, buf.base+walk,buf.len);
-//									c->state = IN_PREAMBLE;
-//									walk += buf.len;
-//								}
-//								break;
-//							case IN_PREAMBLE:
-//							{
-//								int n = c->state_remain;
-//								if(buf.len < n) n = buf.len;
-//								memcpy(c->temp+c->temp_used,buf.base,n);
-//								walk += n;
-//								c->state_remain = c->state_remain - n;
-//								if(c->state_remain == 0) {
-//									if(IS_SINK_PREAMBLE(c->temp)) {
-//										GET_SIZE_FROM_PREAMBLE(c->temp,c->log_entry_size);
-//										c->temp_used = 0;
-//										c->state = IN_LOG_ENTRY;
-//									} else {
-//										DBG_OUT("PipeClient: Bad state. resetting.\n");
-//										c->resetState();
-//									}
-//								}
-//								break;
-//							}
-//							case IN_LOG_ENTRY:
-//							{
-//								if(c->temp_used == 0) { // we aren't using the buffer,
-//									if((buf.len - walk) >= GREASE_TOTAL_MSG_SIZE(c->log_entry_size)) { // let's see if we have everything already
-//										int r;
-//										if((r = c->self->owner->logFromRaw(buf.base,GREASE_TOTAL_MSG_SIZE(c->log_entry_size)))
-//												!= GREASE_OK) {
-//											ERROR_OUT("Grease logFromRaw failure: %d\n", r);
-//										}
-//										walk += c->log_entry_size;
-//										c->resetState();
-//									} else {
-//										memcpy(c->temp,buf.base+walk,buf.len-walk);
-//										c->temp_used = buf.len;
-//										walk += buf.len; // end loop
-//									}
-//								} else {
-//									int need = GREASE_TOTAL_MSG_SIZE(c->log_entry_size) - c->temp_used;
-//									if(need <= buf.len-walk) {
-//										memcpy(c->temp + c->temp_used,buf.base+walk,need);
-//										walk += need;
-//										c->temp_used += need;
-//										int r;
-//										if((r = c->self->owner->logFromRaw(c->temp,GREASE_TOTAL_MSG_SIZE(c->log_entry_size)))
-//												!= GREASE_OK) {
-//											ERROR_OUT("Grease logFromRaw failure (2): %d\n", r);
-//										}
-//										c->resetState();
-//									} else {
-//										memcpy(c->temp + c->temp_used,buf.base+walk,buf.len-walk);
-//										walk += buf.len-walk;
-//										c->temp_used += buf.len-walk;
-//									}
-//								}
-//								break;
-//							}
-//						}
-//					}
-//				}
-//			}
-//		};
-
 		uv_thread_t listener_thread;
 		char *path;
 
@@ -1318,7 +1194,7 @@ protected:
 			}
 
 			for(int n=0;n<nbuffers;n++) {
-				raw_buffer[n] = (char *) ::malloc(rcv_buf_size);
+				raw_buffer[n] = (char *) ::malloc(rcv_buf_size+1);
 			}
 
 			enum {
@@ -1336,7 +1212,10 @@ protected:
 			if(sink->wakeup_pipe[PIPE_WAIT] > n)
 				n = sink->wakeup_pipe[PIPE_WAIT]+1;
 
-			RE2 re_dissect_syslog(re_capture_syslog);
+//			RE2 re_dissect_syslog(re_capture_syslog);
+
+			GreaseLogger *l = GreaseLogger::setupClass();
+			GreaseLogger::singleLog *entry = NULL;
 
 			int recv_cnt = 0;
 			int err_cnt = 0;
@@ -1378,8 +1257,8 @@ protected:
 						// use setsockopt SO_PASSCRED to get the actual calling PID through a recvmsg() as an aux message
 						// This way you can determine the process ID which can be mapped to the origin label
 
-						char header_temp[GREASE_CLIENT_HEADER_SIZE];
-						int header_temp_walk = 0;
+//						char header_temp[GREASE_CLIENT_HEADER_SIZE];
+//						int header_temp_walk = 0;
 						int temp_buffer_walk = 0;
 						int walk = 0;
 						int walk_buf = 0;
@@ -1390,58 +1269,70 @@ protected:
 						uint32_t entry_size;
 						state = NEED_PREAMBLE;
 
-#define SD_WAL_BUF_P (current_buffer + (walk_buf))
-#define SD_WALK(N) do{walk += N; walk_buf += N; remain = remain - N; remain_in_buf = remain_in_buf - N;}while(0)
 
-						// regex capture vars
-						std::string cap_date;
-						int fac_pri; // to understand this, visit MACROs in syslog.h
-						int fac, pri;
-						std::string cap_msg;
-						DECL_LOG_META(meta_syslog, GREASE_TAG_SYSLOG, GREASE_LEVEL_LOG, 0 ); // static meta struct we will use
+						GreaseLogger::syslog_parse_state state = SYSLOG_BEGIN;
 
 						while(iov_n < nbuffers && remain > 0) {
 							if(iov[iov_n].iov_len > 0) {
 
 #ifdef ERRCMN_DEBUG_BUILD
+								// if (!re_dissect_syslog.ok()) {
+								// 	DBG_OUT("OOPS!!!!!!! - regex is not compiling!");
+								// }
 								char *buf = (char *) malloc(iov[iov_n].iov_len+1);
 								::memcpy(buf,iov[iov_n].iov_base,iov[iov_n].iov_len);
 								*(buf+iov[iov_n].iov_len) = 0;
 								DBG_OUT("syslog in %d>> %s\n",iov_n, buf);
 								free(buf);
 #endif
-								if(RE2::FullMatch((char *) iov[iov_n].iov_base,re_dissect_syslog,&fac_pri,&cap_date,&cap_msg)) {
-//									if(cap_date.length() > 3) {
-//										// we figure out the log time here, via strptime() - but honestly, its gonna be when it was sent - so don't bother
-//									}
-									pri = LOG_PRI(fac_pri);
-									if( pri < 8) {
-										meta_syslog.level = GREASE_SYSLOGPRI_TO_LEVEL_MAP[pri];
-									} else {
-										meta_syslog.level = GREASE_LEVEL_LOG;
-										DBG_OUT("out of bounds LOG_PRI ");
-									}
-									fac = LOG_FAC(fac_pri);
-//									DBG_OUT("fac_pri %d  %d\n",fac_pri,fac);
-									if( fac < sizeof(GREASE_SYSLOGFAC_TO_TAG_MAP)) {
-										meta_syslog.tag = GREASE_SYSLOGFAC_TO_TAG_MAP[fac];
-									} else {
-										meta_syslog.tag = GREASE_TAG_SYSLOG;
-										DBG_OUT("out of bounds LOG_FAC %d",fac);
-									}
+
+// 								tempPiece.set((char *) iov[iov_n].iov_base,iov[iov_n].iov_len);
+// 								if(RE2::FullMatch(tempPiece,re_dissect_syslog,&fac_pri,&cap_date,&cap_msg)) {
+// //									if(cap_date.length() > 3) {
+// //										// we figure out the log time here, via strptime() - but honestly, its gonna be when it was sent - so don't bother
+// //									}
+// 									pri = LOG_PRI(fac_pri);
+// 									if( pri < 8) {
+// 										meta_syslog.level = GREASE_SYSLOGPRI_TO_LEVEL_MAP[pri];
+// 									} else {
+// 										meta_syslog.level = GREASE_LEVEL_LOG;
+// 										DBG_OUT("out of bounds LOG_PRI ");
+// 									}
+// 									fac = LOG_FAC(fac_pri);
+// //									DBG_OUT("fac_pri %d  %d\n",fac_pri,fac);
+// 									if( fac < sizeof(GREASE_SYSLOGFAC_TO_TAG_MAP)) {
+// 										meta_syslog.tag = GREASE_SYSLOGFAC_TO_TAG_MAP[fac];
+// 									} else {
+// 										meta_syslog.tag = GREASE_TAG_SYSLOG;
+// 										DBG_OUT("out of bounds LOG_FAC %d",fac);
+// 									}
 
 
-									sink->owner->logP(&meta_syslog,cap_msg.c_str(),cap_msg.length());
+// 									sink->owner->logP(&meta_syslog,cap_msg.c_str(),cap_msg.length());
+// 								} else {
+
+// 									DBG_OUT("NO MATCH @ RE2 for syslog input");
+// 									// regex did not match. - just log the whole message
+// 									sink->owner->logP(&meta_syslog,(char *) iov[iov_n].iov_base,iov[iov_n].iov_len);
+
+// 								}
+
+								int r = recv_cnt;
+								if(l->_grabInLogBuffer(entry) == GREASE_OK) {									
+									if(GreaseLogger::parse_single_syslog_to_singleLog((char *) iov[iov_n].iov_base, r, state, entry)) {
+										entry->incRef();
+										l->_submitBuffer(entry);										
+									} else {
+										if(state == SYSLOG_INVALID) {
+											DBG_OUT("Invalid syslog state! (iovec recvmsg() call)");
+										} else {
+											DBG_OUT("Incomplete syslog on iovec recvmsg() call");
+										}
+										l->_returnBuffer(entry);
+									}
 								} else {
-
-									DBG_OUT("NO MATCH @ RE2 for syslog input");
-									// regex did not match. - just log the whole message
-									sink->owner->logP(&meta_syslog,(char *) iov[iov_n].iov_base,iov[iov_n].iov_len);
-
+									DBG_OUT("SyslogDgramSink::listener_work() failed to _grabInLogBuffer() - ouch.");
 								}
-
-								LOG_META_RESET_CACHE( meta_syslog );
-
 
 								remain -= iov[iov_n].iov_len;
 								iov_n++;
@@ -4137,8 +4028,20 @@ protected:
 	int logFromRaw(char *base, int len);
 
 
-// used for parsing kernel logs
+// used for parsing syslogs
+	enum syslog_parse_state {
+		SYSLOG_BEGIN,
+		SYSLOG_IN_FAC,
+		SYSLOG_IN_DATE_MO,
+		SYSLOG_IN_DATE_DAY,
+		SYSLOG_IN_DATE_TIME,
+		SYSLOG_IN_MESSAGE,
+		SYSLOG_INVALID,
+		SYSLOG_END_LOG
+	};
+	static bool parse_single_syslog_to_singleLog(char *start, int &remain, syslog_parse_state &begin_state, singleLog *entry); //, char *&moved);
 
+// used for parsing kernel logs
 	enum klog_parse_state {
 		LEVEL_BEGIN,  // <
 		IN_LEVEL,     // 0-0
