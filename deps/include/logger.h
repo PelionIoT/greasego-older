@@ -203,7 +203,7 @@ struct uint64_t_eqstrP {
 
 //#define LOGGER_HEAVY_DEBUG 1
 #define MAX_IDENTICAL_FILTERS 16
-
+//#define LOGGER_HEAVY_DEBUG
 #ifdef LOGGER_HEAVY_DEBUG
 #pragma message "Build is Debug Heavy!!"
 // confused? here: https://gcc.gnu.org/onlinedocs/cpp/Variadic-Macros.html
@@ -3369,9 +3369,10 @@ protected:
 			if(sz)
 				ft.current_size += *sz;
 
-			HEAVY_DBG_OUT("sub: %d\n",ft.submittedWrites);
+			HEAVY_DBG_OUT("rotate: sub: %d\n",ft.submittedWrites);
 
 			if(ft.submittedWrites < 1 && ft.filerotation.enabled) {
+				HEAVY_DBG_OUT("rotate: current_size: %d\n",ft.current_size);
 				if(ft.current_size > ft.filerotation.max_file_size) {
 					HEAVY_DBG_OUT("Rotate: past max file size\n");
 					uv_fs_close(ft.owner->loggerLoop, &ft.fileFs, ft.fileHandle, NULL);
