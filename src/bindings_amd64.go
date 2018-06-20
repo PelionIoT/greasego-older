@@ -103,12 +103,13 @@ func getGreaseLib() *GreaseLib {
 type GreaseLibTargetFileOpts struct {
 	//	uint32 _enabledFlags
 	//	uint32_t _enabledFlags;
-	_binding       C.GreaseLibTargetFileOpts
-	Mode           uint32 // permissions for file (recommend default)
-	Flags          uint32 // file flags (recommend default)
-	Max_files      uint32 // max # of files to maintain (rotation)
-	Max_file_size  uint32 // max size for any one file
-	Max_total_size uint64 // max total size to maintain in rotation
+	_binding        C.GreaseLibTargetFileOpts
+	Mode            uint32 // permissions for file (recommend default)
+	Flags           uint32 // file flags (recommend default)
+	Max_files       uint32 // max # of files to maintain (rotation)
+	Max_file_size   uint32 // max size for any one file
+	Max_total_size  uint64 // max total size to maintain in rotation
+	Rotate_on_start bool
 }
 
 // analgous to greaseLib GreaseLibTargetOpts
@@ -534,6 +535,32 @@ func convertOptsToCGreaseLib(opts *GreaseLibTargetOpts) {
 	}
 	if opts.NumBanks > 0 {
 		opts._binding.num_banks = C.uint32_t(opts.NumBanks)
+	}
+	if opts.FileOpts != nil {
+		opts._binding.fileOpts = C.GreaseLib_new_GreaseLibTargetFileOpts()
+		if opts.FileOpts.Max_file_size > 0 {
+			opts._binding.fileOpts.max_file_size = C.uint32_t(opts.FileOpts.Max_file_size)
+			C.GreaseLib_set_flag_GreaseLibTargetFileOpts(opts._binding.fileOpts, C.GREASE_LIB_SET_FILEOPTS_ROTATE)
+			C.GreaseLib_set_flag_GreaseLibTargetFileOpts(opts._binding.fileOpts, C.GREASE_LIB_SET_FILEOPTS_MAXFILESIZE)
+		}
+		if opts.FileOpts.Max_files > 0 {
+			opts._binding.fileOpts.max_files = C.uint32_t(opts.FileOpts.Max_files)
+			C.GreaseLib_set_flag_GreaseLibTargetFileOpts(opts._binding.fileOpts, C.GREASE_LIB_SET_FILEOPTS_ROTATE)
+			C.GreaseLib_set_flag_GreaseLibTargetFileOpts(opts._binding.fileOpts, C.GREASE_LIB_SET_FILEOPTS_MAXFILES)
+		}
+		if opts.FileOpts.Max_total_size > 0 {
+			opts._binding.fileOpts.max_total_size = C.uint64_t(opts.FileOpts.Max_total_size)
+			C.GreaseLib_set_flag_GreaseLibTargetFileOpts(opts._binding.fileOpts, C.GREASE_LIB_SET_FILEOPTS_MAXTOTALSIZE)
+		}
+		if opts.FileOpts.Rotate_on_start {
+			C.GreaseLib_set_flag_GreaseLibTargetFileOpts(opts._binding.fileOpts, C.GREASE_LIB_SET_FILEOPTS_ROTATEONSTART)
+		}
+		if opts.FileOpts.Flags > 0 {
+			opts._binding.fileOpts.flags = C.uint32_t(opts.FileOpts.Flags)
+		}
+		if opts.FileOpts.Mode > 0 {
+			opts._binding.fileOpts.mode = C.uint32_t(opts.FileOpts.Mode)
+		}
 	}
 	C.GreaseLib_set_flag_GreaseLibTargetOpts(&opts._binding, C.uint32_t(opts.flags))
 }
