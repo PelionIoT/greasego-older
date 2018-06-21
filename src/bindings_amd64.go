@@ -386,6 +386,8 @@ func AssignFromStruct(opts interface{}, obj interface{}) { //, typ reflect.Type)
 				DEBUG(fmt.Println("here1"))
 
 				switch field.Type.Kind() {
+				case reflect.Bool:
+					fallthrough
 				case reflect.Int:
 					fallthrough
 				case reflect.Int16:

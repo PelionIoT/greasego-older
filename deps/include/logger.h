@@ -203,7 +203,7 @@ struct uint64_t_eqstrP {
 
 //#define LOGGER_HEAVY_DEBUG 1
 #define MAX_IDENTICAL_FILTERS 16
-//#define LOGGER_HEAVY_DEBUG
+#define LOGGER_HEAVY_DEBUG
 #ifdef LOGGER_HEAVY_DEBUG
 #pragma message "Build is Debug Heavy!!"
 // confused? here: https://gcc.gnu.org/onlinedocs/cpp/Variadic-Macros.html
@@ -3306,7 +3306,12 @@ protected:
 				max_file_size = o.max_file_size;
 				return *this;
 			}
-
+			bool validate() {
+				if (max_files > MAX_ROTATED_FILES) {
+					max_files = MAX_ROTATED_FILES;
+				}
+				return true;
+			}
 		};
 	protected:
 
@@ -3624,7 +3629,7 @@ protected:
 			}
 			static char *strRotateName(char *s, int n) {
 				char *ret = NULL;
-				if(s && n < MAX_ROTATED_FILES && n > 0) {
+				if(s && n > 0) { // n < MAX_ROTATED_FILES &&
 					int origL = strlen(s);
 					ret = (char *) LMALLOC(origL+10);
 					memset(ret,0,origL+10);
@@ -3646,43 +3651,50 @@ protected:
 			while (rotatedFiles.removeMv(f)) {
 				uv_fs_t req;
 				if(filerotation.max_files && ((n+1) > filerotation.max_files)) { // remove file
-					int r = uv_fs_unlink(owner->loggerLoop,&req,f.path,NULL);
-					DBG_OUT("rotate_files::::::::::::::::: fs_unlink %s\n",f.path);
+					if(!f.path) {
+						ERROR_OUT("file rotation - internal error - NULL path\n");
+					} else {
+						int r = uv_fs_unlink(owner->loggerLoop,&req,f.path,NULL);
+						DBG_OUT("rotate_files::::::::::::::::: fs_unlink %s\n",f.path);
 #if (UV_VERSION_MAJOR > 0)
-					if(r < 0) {
-						if(r != UV_ENOENT) {
-							ERROR_OUT("file rotation - remove %s: %s\n", f.path, uv_strerror(r));
+						if(r < 0) {
+							if(r != UV_ENOENT) {
+								ERROR_OUT("file rotation - remove %s: %s\n", f.path, uv_strerror(r));
+							}
 						}
-					}
 #else
-					if(r) {
-						uv_err_t e = uv_last_error(owner->loggerLoop);
-						if(e.code != UV_ENOENT) {
-							ERROR_OUT("file rotation - remove %s: %s\n", f.path, uv_strerror(e));
+						if(r) {
+							uv_err_t e = uv_last_error(owner->loggerLoop);
+							if(e.code != UV_ENOENT) {
+								ERROR_OUT("file rotation - remove %s: %s\n", f.path, uv_strerror(e));
+							}
 						}
-					}
 #endif
+					}
 				} else {  // move file to new name
-//					char *newname = rotatedFile::strRotateName(myPath,f.num+1);
-					rotatedFile new_f(myPath,f.num+1);
-					DBG_OUT("rotate_files::::::::::::::::: fs_rename\n");
-					int r = uv_fs_rename(owner->loggerLoop, &req, f.path, new_f.path, NULL);
+					if (!f.path) {
+						ERROR_OUT("file rotation - internal error (2) - NULL path\n");
+					} else {
+//						char *newname = rotatedFile::strRotateName(myPath,f.num+1);
+						rotatedFile new_f(myPath,f.num+1);
+						DBG_OUT("rotate_files::::::::::::::::: fs_rename\n");
+						int r = uv_fs_rename(owner->loggerLoop, &req, f.path, new_f.path, NULL);
 #if (UV_VERSION_MAJOR > 0)
-					if(r < 0) {
-						ERROR_OUT("file rotation - rename %s: %s\n", f.path, uv_strerror(r));
+						if(r < 0) {
+							ERROR_OUT("file rotation - rename %s: %s\n", f.path, uv_strerror(r));
 #else
-					if(r) {
-						uv_err_t e = uv_last_error(owner->loggerLoop);
-						if(e.code != UV_OK) {
-							ERROR_OUT("file rotation - rename %s: %s\n", f.path, uv_strerror(e));
-					}
+						if(r) {
+							uv_err_t e = uv_last_error(owner->loggerLoop);
+							if(e.code != UV_OK) {
+								ERROR_OUT("file rotation - rename %s: %s\n", f.path, uv_strerror(e));
+							}
 #endif
-
-//						if(e.code != UV_ENOENT) {
-//							ERROR_OUT("file rotation - rename %s: %s\n", f.path, uv_strerror(e));
-//						}
+//							if(e.code != UV_ENOENT) {
+//								ERROR_OUT("file rotation - rename %s: %s\n", f.path, uv_strerror(e));
+//							}
+						}
+						tempFiles.addMv(new_f);
 					}
-					tempFiles.addMv(new_f);
 				}
 				n--;
 			}
@@ -3713,6 +3725,7 @@ protected:
 			bool needs_rotation = false;
 			uv_fs_t req;
 			rotatedFiles.clear();
+			HEAVY_DBG_OUT("rotation: check_files(%s)\n",myPath);
 			// find existing file...
 			int r = uv_fs_stat(owner->loggerLoop, &req, myPath, NULL);
 #if (UV_VERSION_MAJOR > 0)
@@ -3733,34 +3746,42 @@ protected:
 				current_size = req.statbuf.st_size;
 			}
 
-			int n = 1;
-			while(1) {  // find all files...
+			int n = filerotation.max_files;
+			while(n > 0) {  // find all files...
 				uv_fs_t req;
 				rotatedFile f(myPath,n);
-				if(!f.path) break; // either something went wrong, or we are past the max rotation of files
+				if(!f.path) {
+					HEAVY_DBG_OUT("rotation: f.path NULL - should not happen\n");
+					break; // either something went wrong, or we are past the max rotation of files
+				}
+				HEAVY_DBG_OUT("file rotation: fs_stat %s\n",f.path);
 				int r = uv_fs_stat(owner->loggerLoop, &req, f.path, NULL);
 #if (UV_VERSION_MAJOR > 0)
 				if(r < 0) {
 					if(r != UV_ENOENT) {
 						ERROR_OUT("file rotation: [path:%s]: %s\n", f.path, uv_strerror(r));
 					}
-					break;
+//					break;
 #else
 				if(r) {
 					uv_err_t e = uv_last_error(owner->loggerLoop);
 					if(e.code && e.code != UV_ENOENT) {
 						ERROR_OUT("file rotation [path:%s]: %s\n", f.path, uv_strerror(e));
 					}
+					HEAVY_DBG_OUT("rotation: end check_files()\n")
 					break;
 #endif
 				} else {
 					f.size = req.statbuf.st_size;
+					HEAVY_DBG_OUT("rotation: found file: %s of size %d\n",f.path,f.size);
 					rotatedFiles.addMv(f);
 					all_files_size += req.statbuf.st_size;
-					n++;
+
 				}
+				n--;
 			}
-			rotatedFiles.reverse();
+			HEAVY_DBG_OUT("rotation: all_files_size: %d\n",all_files_size);
+//			rotatedFiles.reverse();
 			if(all_files_size > filerotation.max_total_size)
 				needs_rotation = true;
 			return needs_rotation;
@@ -3778,14 +3799,17 @@ protected:
 				err.setError(GREASE_UNKNOWN_NO_PATH);
 				readyCB(false,err,this);
 			} else {
+				filerotation.validate();
 				fileFs.data = this;
-
 
 				if(filerotation.enabled) {
 					bool needs_rotate = check_files();
 					HEAVY_DBG_OUT("rotate_files: total files = %d total size = %d\n",rotatedFiles.remaining()+1,all_files_size);
 					if(needs_rotate || filerotation.rotate_on_start) {
 						HEAVY_DBG_OUT("Needs rotate....\n");
+						if (filerotation.rotate_on_start) {
+							// ok - need to preload the list of existing log files.							
+						}
 						rotate_files();
 					}
 
