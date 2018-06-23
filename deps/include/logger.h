@@ -3379,9 +3379,9 @@ protected:
 			if(ft.submittedWrites < 1 && ft.filerotation.enabled) {
 				HEAVY_DBG_OUT("rotate: current_size: %d\n",ft.current_size);
 				if(ft.current_size > ft.filerotation.max_file_size) {
-					HEAVY_DBG_OUT("Rotate: past max file size\n");
+					HEAVY_DBG_OUT("rotate: past max file size\n");
 					uv_fs_close(ft.owner->loggerLoop, &ft.fileFs, ft.fileHandle, NULL);
-
+					HEAVY_DBG_OUT("rotate: now rotate_files()\n");
 					ft.rotate_files();
 
 					int r = uv_fs_open(ft.owner->loggerLoop, &ft.fileFs, ft.myPath, ft.myFlags, ft.myMode, NULL); // use default loop because we need on_open() cb called in event loop of node.js
@@ -3740,8 +3740,12 @@ protected:
 #endif
 			} else {
 				// if the current file is too big - we need to rotate.
-				if(filerotation.max_file_size && filerotation.max_file_size < req.statbuf.st_size)
+				HEAVY_DBG_OUT("rotation: current file %s is %d bytes\n",myPath,req.statbuf.st_size);
+				if(filerotation.max_file_size && filerotation.max_file_size < req.statbuf.st_size) {
 					needs_rotation = true;
+					HEAVY_DBG_OUT("rotation: current files needs rotation.\n");					
+				}
+
 				all_files_size += req.statbuf.st_size;
 				current_size = req.statbuf.st_size;
 			}
