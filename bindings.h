@@ -25,5 +25,4 @@ extern logMeta go_self_meta_warning;
 extern logMeta go_self_meta_error;
 extern logMeta go_self_meta_debug;
 extern logMeta go_self_meta_success;
-
 #endif

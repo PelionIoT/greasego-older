@@ -51,6 +51,7 @@ typedef struct {
 	void *_shadow; // this is the original C++ GreaseLogger::lohBuf object, which we can't have a proper point to - so we just do this
 } GreaseLibBuf;
 
+void GreaseLib_getVersion(char *s, int len);
 void GreaseLib_init_GreaseLibBuf(GreaseLibBuf *b);
 GreaseLibBuf *GreaseLib_new_GreaseLibBuf(size_t l);
 void GreaseLib_cleanup_GreaseLibBuf(GreaseLibBuf *b); // should be called when the callback is done using the buffer it was handed

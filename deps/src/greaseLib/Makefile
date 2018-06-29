@@ -71,10 +71,14 @@ $(OUTPUT_DIR)/%.o: %.cc
 $(OUTPUT_DIR)/%.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
+.PHONY: getversion
+
+getversion:
+	./update_version.sh
 
 libgrease.so.1: CFLAGS += -shared -Wl,-soname,libgrease.so.1  -Wl,--no-as-needed -ldl
-libgrease.so.1: $(OBJS) 
-	$(CXX) $(CFLAGS) $(LDFLAGS)  -o $@ $^ 
+libgrease.so.1: $(OBJS) getversion
+	$(CXX) $(CFLAGS) $(LDFLAGS)  -o $@ $(OBJS) 
 
 # -g -O0
 # -DERRCMN_DEBUG_BUILD  -Wl,--whole-archive -ldl -Wl,--no-whole-archive -Wl,--no-undefined -Wl,-Bstatic -ldl -Wl,-Bdynamic -Wl,--whole-archive -Wl,--no-whole-archive
@@ -84,11 +88,11 @@ libgrease.so.1-debug: $(OBJS)
 
 
 libgrease.a: CFLAGS += -static -DGREASE_LIB
-libgrease.a: $(OBJS)
+libgrease.a: $(OBJS) getversion
 	$(AR) rcs $@ $^ 
 
 libgrease.a-server-debug: CFLAGS += -DERRCMN_DEBUG_BUILD -g -O0 -DGREASE_IS_LOCAL -static -DGREASE_LIB 
-libgrease.a-server-debug: $(OBJS)
+libgrease.a-server-debug: $(OBJS) getversion
 	$(AR) rcs libgrease.a $^ 
 
 libgrease.a-server: CFLAGS += -DGREASE_IS_LOCAL -static -DGREASE_LIB 

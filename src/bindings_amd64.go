@@ -11,7 +11,6 @@ package greasego
 #include <stdlib.h>
 #include "grease_lib.h"
 #include "bindings.h"
-
 */
 import "C"
 
@@ -87,6 +86,20 @@ type GreaseLib struct {
 type GreaseLibCallbackEvent struct {
 	data interface{}
 	err  *GreaseError
+}
+
+// GetGreaseLibVersion returns the version of the underlying greaseLib.so
+// shared library in use
+func GetGreaseLibVersion() (ret string) {
+	// unbelievable the amount of syntax juggling one needs to
+	// simply send come char data back to Go. wtf.
+	len := C.size_t(150)
+	mem := C.malloc(len)
+	schar := (*C.char)(*(*unsafe.Pointer)(mem))
+	C.GreaseLib_getVersion(schar, C.int(len))
+	ret = C.GoString(schar)
+	C.free(mem)
+	return
 }
 
 // The library currently only supports a single instance

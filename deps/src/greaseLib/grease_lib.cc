@@ -13,9 +13,18 @@
 #include "grease_client.h"
 #include "grease_common_tags.h"
 #include "logger.h"
+#include "version.h"
 
 using namespace Grease;
 
+
+// dumps version information to s, with a maximum
+// char output of len
+void GreaseLib_getVersion(char *s, int len) {
+	if (len > 1) {
+		snprintf(s,len-1,"grease_lib ver %s commit %s",GREASE_LIB_VERSION,GREASE_LIB_COMMIT);
+	}
+}
 
 void GreaseLib_init_GreaseLibBuf(GreaseLibBuf *b)
 {
