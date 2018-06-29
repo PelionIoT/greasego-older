@@ -95,7 +95,7 @@ func GetGreaseLibVersion() (ret string) {
 	// simply send come char data back to Go. wtf.
 	len := C.size_t(150)
 	mem := C.malloc(len)
-	schar := (*C.char)(*(*unsafe.Pointer)(mem))
+	schar := (*C.char)(unsafe.Pointer(mem))
 	C.GreaseLib_getVersion(schar, C.int(len))
 	ret = C.GoString(schar)
 	C.free(mem)
