@@ -77,37 +77,36 @@ getversion:
 	./update_version.sh
 
 libgrease.so.1: CFLAGS += -shared -Wl,-soname,libgrease.so.1  -Wl,--no-as-needed -ldl
-libgrease.so.1: $(OBJS) getversion
+libgrease.so.1: getversion $(OBJS)
 	$(CXX) $(CFLAGS) $(LDFLAGS)  -o $@ $(OBJS) 
 
 # -g -O0
 # -DERRCMN_DEBUG_BUILD  -Wl,--whole-archive -ldl -Wl,--no-whole-archive -Wl,--no-undefined -Wl,-Bstatic -ldl -Wl,-Bdynamic -Wl,--whole-archive -Wl,--no-whole-archive
 libgrease.so.1-debug: CFLAGS += -DERRCMN_DEBUG_BUILD -g -O0 -shared -Wl,-soname,libgrease.so.1 -Wl,--no-as-needed -ldl
-libgrease.so.1-debug: $(OBJS) getversion
+libgrease.so.1-debug: getversion $(OBJS)
 	$(CXX) $(CFLAGS) $(LDFLAGS)  -o $@ $(OBJS)
 
 
 libgrease.a: CFLAGS += -static -DGREASE_LIB
-libgrease.a: $(OBJS) getversion
+libgrease.a: getversion $(OBJS)
 	$(AR) rcs $@ $(OBJS)
 
 libgrease.a-server-debug: CFLAGS += -DERRCMN_DEBUG_BUILD -g -O0 -DGREASE_IS_LOCAL -static -DGREASE_LIB 
-libgrease.a-server-debug: $(OBJS) getversion
+libgrease.a-server-debug: getversion $(OBJS)
 	$(AR) rcs libgrease.a $(OBJS)
 
 libgrease.a-server: CFLAGS += -DGREASE_IS_LOCAL -static -DGREASE_LIB 
-libgrease.a-server: $(OBJS) getversion
+libgrease.a-server: getversion $(OBJS)
 	$(AR) rcs libgrease.a $(OBJS) 
 
 
 standalone_test_logsink: CFLAGS+= -DGREASE_LIB -I./deps/$(LIBUVDIR)/include -I./deps/twlib/include
-standalone_test_logsink: standalone_test_logsink.o libgrease.a
+standalone_test_logsink: getversion standalone_test_logsink.o libgrease.a
 	$(CXX) $(CXXFLAGS) $(CFLAGS) libgrease.a $(LDFLAGS) -lpthread -pthread  -o $@ 
 
 grease_echo: CFLAGS+= -DGREASE_LIB -I./deps/$(LIBUVDIR)/include -I./deps/twlib/include
 grease_echo: $(OUTPUT_DIR)/grease_client.o $(OUTPUT_DIR)/grease_echo.o
 	$(CXX) $(CXXFLAGS) $(CFLAGS) $^ -ldl -o $@ 
-
 
 
 install: tw_lib $(EXTRA_TARGET)
