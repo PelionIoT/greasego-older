@@ -753,6 +753,7 @@ LIB_METHOD_SYNC(modifyDefaultTarget,GreaseLibTargetOpts *opts) {
 			}
 
 			if(opts->fileOpts->_enabledFlags & GREASE_LIB_SET_FILEOPTS_ROTATE) {
+				rotateOpts.enabled = true;
 				if(opts->fileOpts->_enabledFlags & GREASE_LIB_SET_FILEOPTS_MAXFILES) rotateOpts.max_files = opts->fileOpts->max_files;
 				if(opts->fileOpts->_enabledFlags & GREASE_LIB_SET_FILEOPTS_MAXFILESIZE) rotateOpts.max_file_size = opts->fileOpts->max_file_size;
 				if(opts->fileOpts->_enabledFlags & GREASE_LIB_SET_FILEOPTS_MAXTOTALSIZE) rotateOpts.max_total_size = opts->fileOpts->max_total_size;
