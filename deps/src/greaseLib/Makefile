@@ -1,5 +1,5 @@
 
-LDFLAGS ?= -lpthread -pthread 
+#LDFLAGS ?= -lpthread -pthread 
 # TWSOVERSION is the compiler version...
 # see http://rute.2038bug.com/node26.html.gz
 
@@ -38,7 +38,7 @@ LD_TEST_FLAGS= -lgtest
 ## concerning the -whole-archive flags: http://stackoverflow.com/questions/14889941/link-a-static-library-to-a-shared-one-during-build
 ## originally we used that when creating the node module version of greaseLogger - but apparently needed for tcmalloc here also
 # -luv -lTW
-LDFLAGS += -L./deps/build/lib  -ldl -lm -ltcmalloc_minimal -lstacktrace -lstdc++
+LDFLAGS += -L./deps/build/lib  -ldl -lm -ltcmalloc_minimal -lstacktrace -lstdc++ -lpthread -pthread
 # -Wl,-whole-archive deps/build/lib/libtcmalloc_minimal.a -Wl,-no-whole-archive 
 STATIC_LIB_FLAGS= -ldl -lTW -lm -Wl,-whole-archive deps/build/lib/libtcmalloc_minimal.a -Wl,-no-whole-archive
 
