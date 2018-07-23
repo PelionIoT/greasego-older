@@ -78,13 +78,13 @@ getversion:
 
 libgrease.so.1: CFLAGS += -shared -Wl,-soname,libgrease.so.1  -Wl,--no-as-needed -ldl
 libgrease.so.1: getversion $(OBJS)
-	$(CXX) $(CFLAGS) $(LDFLAGS)  -o $@ $(OBJS) 
+	$(CXX) $(CFLAGS) $(LDFLAGS)  -Wl,-z,defs -o $@ $(OBJS) ../../lib/libuv.a ../../lib/libTW.a
 
 # -g -O0
 # -DERRCMN_DEBUG_BUILD  -Wl,--whole-archive -ldl -Wl,--no-whole-archive -Wl,--no-undefined -Wl,-Bstatic -ldl -Wl,-Bdynamic -Wl,--whole-archive -Wl,--no-whole-archive
 libgrease.so.1-debug: CFLAGS += -DERRCMN_DEBUG_BUILD -g -O0 -shared -Wl,-soname,libgrease.so.1 -Wl,--no-as-needed -ldl
 libgrease.so.1-debug: getversion $(OBJS)
-	$(CXX) $(CFLAGS) $(LDFLAGS)  -o $@ $(OBJS)
+	$(CXX) $(CFLAGS) $(LDFLAGS)  -Wl,-z,defs -o $@ $(OBJS) ../../lib/libuv.a ../../lib/libTW.a
 
 
 libgrease.a: CFLAGS += -static -DGREASE_LIB
