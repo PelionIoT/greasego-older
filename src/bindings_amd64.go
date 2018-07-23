@@ -4,7 +4,7 @@ package greasego
 
 /*
 #cgo LDFLAGS: -L/usr/lib/x86_64-linux-gnu -L${SRCDIR}/deps/lib
-#cgo LDFLAGS: -lgrease -luv -lTW -lstdc++ -lm -ltcmalloc_minimal
+#cgo LDFLAGS: -lgrease -lstdc++ -lm -ltcmalloc_minimal
 #cgo CFLAGS: -I${SRCDIR}/deps/include DEBUG(-DDEBUG_BINDINGS)
 #define GREASE_IS_LOCAL 1
 #include <stdio.h>
@@ -24,6 +24,7 @@ import (
 	//	"sync/atomic"
 )
 
+// no longer including these, as they are statically in libgrease: -luv -lTW
 //-static-libgcc
 // # cgo LDFLAGS: /usr/lib/x86_64-linux-gnu/libunwind-coredump.so.0
 
