@@ -37,7 +37,8 @@ LD_TEST_FLAGS= -lgtest
 
 ## concerning the -whole-archive flags: http://stackoverflow.com/questions/14889941/link-a-static-library-to-a-shared-one-during-build
 ## originally we used that when creating the node module version of greaseLogger - but apparently needed for tcmalloc here also
-LDFLAGS += -L./deps/build/lib -luv -ldl -lTW -lm -ltcmalloc_minimal -lstacktrace -lstdc++
+# -luv -lTW
+LDFLAGS += -L./deps/build/lib  -ldl -lm -ltcmalloc_minimal -lstacktrace -lstdc++
 # -Wl,-whole-archive deps/build/lib/libtcmalloc_minimal.a -Wl,-no-whole-archive 
 STATIC_LIB_FLAGS= -ldl -lTW -lm -Wl,-whole-archive deps/build/lib/libtcmalloc_minimal.a -Wl,-no-whole-archive
 
@@ -76,15 +77,17 @@ $(OUTPUT_DIR)/%.o: %.c
 getversion:
 	./update_version.sh
 
+# -Wl,-z,defs 
 libgrease.so.1: CFLAGS += -shared -Wl,-soname,libgrease.so.1  -Wl,--no-as-needed -ldl
 libgrease.so.1: getversion $(OBJS)
-	$(CXX) $(CFLAGS) $(LDFLAGS)  -Wl,-z,defs -o $@ $(OBJS) deps/build/lib/libuv.a deps/build/lib/libTW.a
+	$(CXX) $(CFLAGS)  -o $@ $(OBJS) deps/build/lib/libuv.a deps/build/lib/libTW.a $(LDFLAGS) 
 
 # -g -O0
 # -DERRCMN_DEBUG_BUILD  -Wl,--whole-archive -ldl -Wl,--no-whole-archive -Wl,--no-undefined -Wl,-Bstatic -ldl -Wl,-Bdynamic -Wl,--whole-archive -Wl,--no-whole-archive
+#  -Wl,-z,defs (to test for missing defs)
 libgrease.so.1-debug: CFLAGS += -DERRCMN_DEBUG_BUILD -g -O0 -shared -Wl,-soname,libgrease.so.1 -Wl,--no-as-needed -ldl
 libgrease.so.1-debug: getversion $(OBJS)
-	$(CXX) $(CFLAGS) $(LDFLAGS)  -Wl,-z,defs -o $@ $(OBJS) deps/build/lib/libuv.a deps/build/lib/libTW.a
+	$(CXX) $(CFLAGS) -o $@ $(OBJS) deps/build/lib/libuv.a deps/build/lib/libTW.a $(LDFLAGS)  
 
 
 libgrease.a: CFLAGS += -static -DGREASE_LIB
@@ -92,7 +95,7 @@ libgrease.a: getversion $(OBJS)
 	$(AR) rcs $@ $(OBJS)
 
 libgrease.a-server-debug: CFLAGS += -DERRCMN_DEBUG_BUILD -g -O0 -DGREASE_IS_LOCAL -static -DGREASE_LIB 
-libgrease.a-server-debug: getversion $(OBJS)
+libgrease.a-server-debug: getversion $(OBJS) deps/build/lib/libuv.a deps/build/lib/libTW.a
 	$(AR) rcs libgrease.a $(OBJS)
 
 libgrease.a-server: CFLAGS += -DGREASE_IS_LOCAL -static -DGREASE_LIB 
@@ -102,7 +105,7 @@ libgrease.a-server: getversion $(OBJS)
 
 standalone_test_logsink: CFLAGS+= -DGREASE_LIB -I./deps/$(LIBUVDIR)/include -I./deps/twlib/include
 standalone_test_logsink: getversion standalone_test_logsink.o libgrease.a
-	$(CXX) $(CXXFLAGS) $(CFLAGS) libgrease.a $(LDFLAGS) -lpthread -pthread  -o $@ 
+	$(CXX) $(CXXFLAGS) $(CFLAGS) libgrease.a deps/build/lib/libuv.a deps/build/lib/libTW.a $(LDFLAGS) -lpthread -pthread  -o $@ 
 
 grease_echo: CFLAGS+= -DGREASE_LIB -I./deps/$(LIBUVDIR)/include -I./deps/twlib/include
 grease_echo: $(OUTPUT_DIR)/grease_client.o $(OUTPUT_DIR)/grease_echo.o
