@@ -19,7 +19,7 @@ ALLOBJS= $($<:%.cpp=%.o)
 
 DEBUG_OPTIONS=-rdynamic -D_TW_TASK_DEBUG_THREADS_ -DLOGGER_HEAVY_DEBUG  -D__DEBUG -D_TW_DEBUG 
 #-D_TW_BUFBLK_DEBUG_STACK_
-CFLAGS= $(GLIBCFLAG) -I./include   -fPIC -I./deps/$(LIBUVDIR)/include -I./deps/build/include  -L./deps/build/lib -DGREASE_LIB
+CFLAGS= $(GLIBCFLAG) -I./include   -fPIC -I./deps/$(LIBUVDIR)/include -I./deps/build/include  -L./deps/build/lib -DGREASE_LIB  -Wno-error=format-security
 
 DEBUG_CFLAGS= -g -DERRCMN_DEBUG_BUILD $(DEBUG_OPTIONS)
 
